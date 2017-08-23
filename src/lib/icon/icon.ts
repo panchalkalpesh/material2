@@ -1,3 +1,11 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {
   ChangeDetectionStrategy,
   Component,
@@ -6,22 +14,25 @@ import {
   OnChanges,
   OnInit,
   Renderer2,
-  SimpleChange,
+  SimpleChanges,
   ViewEncapsulation,
-  AfterViewChecked,
+  Attribute,
 } from '@angular/core';
 import {MdIconRegistry} from './icon-registry';
-import {MdIconNameNotFoundError, MdIconInvalidNameError} from './icon-errors';
+import {CanColor, mixinColor} from '../core/common-behaviors/color';
+import {first} from '../core/rxjs/index';
+
+
+// Boilerplate for applying mixins to MdIcon.
+/** @docs-private */
+export class MdIconBase {
+  constructor(public _renderer: Renderer2, public _elementRef: ElementRef) {}
+}
+export const _MdIconMixinBase = mixinColor(MdIconBase);
 
 
 /**
  * Component to display an icon. It can be used in the following ways:
- * - Specify the svgSrc input to load an SVG icon from a URL. The SVG content is directly inlined
- *   as a child of the <md-icon> component, so that CSS styles can easily be applied to it.
- *   The URL is loaded via an XMLHttpRequest, so it must be on the same domain as the page or its
- *   server must be configured to allow cross-domain requests.
- *   Example:
- *     <md-icon svgSrc="assets/arrow.svg"></md-icon>
  *
  * - Specify the svgIcon input to load an SVG icon from a URL previously registered with the
  *   addSvgIcon, addSvgIconInNamespace, addSvgIconSet, or addSvgIconSetInNamespace methods of
@@ -52,15 +63,15 @@ import {MdIconNameNotFoundError, MdIconInvalidNameError} from './icon-errors';
   template: '<ng-content></ng-content>',
   selector: 'md-icon, mat-icon',
   styleUrls: ['icon.css'],
+  inputs: ['color'],
   host: {
     'role': 'img',
-    '[class.mat-icon]': 'true',
+    'class': 'mat-icon',
   },
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdIcon implements OnChanges, OnInit, AfterViewChecked {
-  private _color: string;
+export class MdIcon extends _MdIconMixinBase implements OnChanges, OnInit, CanColor {
 
   /** Name of the icon in the SVG icon set. */
   @Input() svgIcon: string;
@@ -71,39 +82,20 @@ export class MdIcon implements OnChanges, OnInit, AfterViewChecked {
   /** Name of an icon within a font set. */
   @Input() fontIcon: string;
 
-  /** Alt label to be used for accessibility. */
-  @Input() alt: string;
-
-  /** Screenreader label for the icon. */
-  @Input('aria-label') hostAriaLabel: string = '';
-
-  /** Color of the icon. */
-  @Input()
-  get color(): string { return this._color; }
-  set color(value: string) { this._updateColor(value); }
-
   private _previousFontSetClass: string;
   private _previousFontIconClass: string;
-  private _previousAriaLabel: string;
 
   constructor(
-      private _elementRef: ElementRef,
-      private _renderer: Renderer2,
-      private _mdIconRegistry: MdIconRegistry) { }
+      renderer: Renderer2,
+      elementRef: ElementRef,
+      private _mdIconRegistry: MdIconRegistry,
+      @Attribute('aria-hidden') ariaHidden: string) {
+    super(renderer, elementRef);
 
-  _updateColor(newColor: string) {
-    this._setElementColor(this._color, false);
-    this._setElementColor(newColor, true);
-    this._color = newColor;
-  }
-
-  _setElementColor(color: string, isAdd: boolean) {
-    if (color != null && color != '') {
-      if (isAdd) {
-        this._renderer.addClass(this._elementRef.nativeElement, `mat-${color}`);
-      } else {
-        this._renderer.removeClass(this._elementRef.nativeElement, `mat-${color}`);
-      }
+    // If the user has not explicitly set aria-hidden, mark the icon as hidden, as this is
+    // the right thing to do for the majority of icon use-cases.
+    if (!ariaHidden) {
+      renderer.setAttribute(elementRef.nativeElement, 'aria-hidden', 'true');
     }
   }
 
@@ -113,12 +105,12 @@ export class MdIcon implements OnChanges, OnInit, AfterViewChecked {
    * The separator for the two fields is ':'. If there is no separator, an empty
    * string is returned for the icon set and the entire value is returned for
    * the icon name. If the argument is falsy, returns an array of two empty strings.
-   * Throws a MdIconInvalidNameError if the name contains two or more ':' separators.
+   * Throws an error if the name contains two or more ':' separators.
    * Examples:
    *   'social:cake' -> ['social', 'cake']
    *   'penguin' -> ['', 'penguin']
    *   null -> ['', '']
-   *   'a:b:c' -> (throws MdIconInvalidNameError)
+   *   'a:b:c' -> (throws Error)
    */
   private _splitIconName(iconName: string): [string, string] {
     if (!iconName) {
@@ -126,31 +118,29 @@ export class MdIcon implements OnChanges, OnInit, AfterViewChecked {
     }
     const parts = iconName.split(':');
     switch (parts.length) {
-      case 1:
-        // Use default namespace.
-        return ['', parts[0]];
-      case 2:
-        return <[string, string]>parts;
-      default:
-        throw new MdIconInvalidNameError(iconName);
+      case 1: return ['', parts[0]]; // Use default namespace.
+      case 2: return <[string, string]>parts;
+      default: throw Error(`Invalid icon name: "${iconName}"`);
     }
   }
 
-  ngOnChanges(changes: { [propertyName: string]: SimpleChange }) {
-    const changedInputs = Object.keys(changes);
+  ngOnChanges(changes: SimpleChanges) {
     // Only update the inline SVG icon if the inputs changed, to avoid unnecessary DOM operations.
-    if (changedInputs.indexOf('svgIcon') != -1 || changedInputs.indexOf('svgSrc') != -1) {
+    if (changes.svgIcon) {
       if (this.svgIcon) {
         const [namespace, iconName] = this._splitIconName(this.svgIcon);
-        this._mdIconRegistry.getNamedSvgIcon(iconName, namespace).first().subscribe(
+
+        first.call(this._mdIconRegistry.getNamedSvgIcon(iconName, namespace)).subscribe(
             svg => this._setSvgElement(svg),
-            (err: MdIconNameNotFoundError) => console.log(`Error retrieving icon: ${err.message}`));
+            (err: Error) => console.log(`Error retrieving icon: ${err.message}`));
+      } else {
+        this._clearSvgElement();
       }
     }
+
     if (this._usingFontIcon()) {
       this._updateFontIconClasses();
     }
-    this._updateAriaLabel();
   }
 
   ngOnInit() {
@@ -161,64 +151,36 @@ export class MdIcon implements OnChanges, OnInit, AfterViewChecked {
     }
   }
 
-  ngAfterViewChecked() {
-    // Update aria label here because it may depend on the projected text content.
-    // (e.g. <md-icon>home</md-icon> should use 'home').
-    this._updateAriaLabel();
-  }
-
-  private _updateAriaLabel() {
-      const ariaLabel = this._getAriaLabel();
-      if (ariaLabel && ariaLabel !== this._previousAriaLabel) {
-        this._previousAriaLabel = ariaLabel;
-        this._renderer.setAttribute(this._elementRef.nativeElement, 'aria-label', ariaLabel);
-      }
-  }
-
-  private _getAriaLabel() {
-    // If the parent provided an aria-label attribute value, use it as-is. Otherwise look for a
-    // reasonable value from the alt attribute, font icon name, SVG icon name, or (for ligatures)
-    // the text content of the directive.
-    const label =
-        this.hostAriaLabel ||
-        this.alt ||
-        this.fontIcon ||
-        this._splitIconName(this.svgIcon)[1];
-    if (label) {
-      return label;
-    }
-    // The "content" of an SVG icon is not a useful label.
-    if (this._usingFontIcon()) {
-      const text = this._elementRef.nativeElement.textContent;
-      if (text) {
-        return text;
-      }
-    }
-    // TODO: Warn here in dev mode.
-    return null;
-  }
-
   private _usingFontIcon(): boolean {
     return !this.svgIcon;
   }
 
   private _setSvgElement(svg: SVGElement) {
+    this._clearSvgElement();
+    this._renderer.appendChild(this._elementRef.nativeElement, svg);
+  }
+
+  private _clearSvgElement() {
     const layoutElement = this._elementRef.nativeElement;
-    // Remove existing child nodes and add the new SVG element.
-    // We would use renderer.detachView(Array.from(layoutElement.childNodes)) here,
-    // but it fails in IE11: https://github.com/angular/angular/issues/6327
-    layoutElement.innerHTML = '';
-    this._renderer.appendChild(layoutElement, svg);
+    const childCount = layoutElement.childNodes.length;
+
+    // Remove existing child nodes and add the new SVG element. Note that we can't
+    // use innerHTML, because IE will throw if the element has a data binding.
+    for (let i = 0; i < childCount; i++) {
+      this._renderer.removeChild(layoutElement, layoutElement.childNodes[i]);
+    }
   }
 
   private _updateFontIconClasses() {
     if (!this._usingFontIcon()) {
       return;
     }
+
     const elem = this._elementRef.nativeElement;
     const fontSetClass = this.fontSet ?
         this._mdIconRegistry.classNameForFontAlias(this.fontSet) :
         this._mdIconRegistry.getDefaultFontSetClass();
+
     if (fontSetClass != this._previousFontSetClass) {
       if (this._previousFontSetClass) {
         this._renderer.removeClass(elem, this._previousFontSetClass);

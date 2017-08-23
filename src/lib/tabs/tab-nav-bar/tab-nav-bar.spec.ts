@@ -1,17 +1,15 @@
-import {async, ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing';
-import {MdTabsModule} from '../index';
-import {MdTabNavBar} from './tab-nav-bar';
+import {async, ComponentFixture, fakeAsync, TestBed, tick} from '@angular/core/testing';
 import {Component, ViewChild} from '@angular/core';
 import {By} from '@angular/platform-browser';
-import {ViewportRuler} from '../../core/overlay/position/viewport-ruler';
-import {FakeViewportRuler} from '../../core/overlay/position/fake-viewport-ruler';
-import {dispatchMouseEvent, dispatchFakeEvent} from '../../core/testing/dispatch-events';
-import {LayoutDirection, Dir} from '../../core/rtl/dir';
+import {ViewportRuler} from '@angular/cdk/scrolling';
+import {dispatchFakeEvent, dispatchMouseEvent, FakeViewportRuler} from '@angular/cdk/testing';
+import {Direction, Directionality} from '@angular/cdk/bidi';
 import {Subject} from 'rxjs/Subject';
+import {MdTabNav, MdTabsModule, MdTabLink} from '../index';
 
 
 describe('MdTabNavBar', () => {
-  let dir: LayoutDirection = 'ltr';
+  let dir: Direction = 'ltr';
   let dirChange = new Subject();
 
   beforeEach(async(() => {
@@ -22,9 +20,10 @@ describe('MdTabNavBar', () => {
         TabLinkWithNgIf,
       ],
       providers: [
-        {provide: Dir, useFactory: () => {
-          return {value: dir,  dirChange: dirChange.asObservable()};
-        }},
+        {provide: Directionality, useFactory: () => ({
+          value: dir,
+          change: dirChange.asObservable()
+        })},
         {provide: ViewportRuler, useClass: FakeViewportRuler},
       ]
     });
@@ -37,20 +36,99 @@ describe('MdTabNavBar', () => {
 
     beforeEach(() => {
       fixture = TestBed.createComponent(SimpleTabNavBarTestApp);
+      fixture.detectChanges();
     });
 
     it('should change active index on click', () => {
-      let component = fixture.debugElement.componentInstance;
-
       // select the second link
       let tabLink = fixture.debugElement.queryAll(By.css('a'))[1];
       tabLink.nativeElement.click();
-      expect(component.activeIndex).toBe(1);
+      expect(fixture.componentInstance.activeIndex).toBe(1);
 
       // select the third link
       tabLink = fixture.debugElement.queryAll(By.css('a'))[2];
       tabLink.nativeElement.click();
-      expect(component.activeIndex).toBe(2);
+      expect(fixture.componentInstance.activeIndex).toBe(2);
+    });
+
+    it('should add the disabled class if disabled', () => {
+      const tabLinkElements = fixture.debugElement.queryAll(By.css('a'))
+        .map(tabLinkDebugEl => tabLinkDebugEl.nativeElement);
+
+      expect(tabLinkElements.every(tabLinkEl => !tabLinkEl.classList.contains('mat-tab-disabled')))
+        .toBe(true, 'Expected every tab link to not have the disabled class initially');
+
+      fixture.componentInstance.disabled = true;
+      fixture.detectChanges();
+
+      expect(tabLinkElements.every(tabLinkEl => tabLinkEl.classList.contains('mat-tab-disabled')))
+        .toBe(true, 'Expected every tab link to have the disabled class if set through binding');
+    });
+
+    it('should update aria-disabled if disabled', () => {
+      const tabLinkElements = fixture.debugElement.queryAll(By.css('a'))
+        .map(tabLinkDebugEl => tabLinkDebugEl.nativeElement);
+
+      expect(tabLinkElements.every(tabLink => tabLink.getAttribute('aria-disabled') === 'false'))
+        .toBe(true, 'Expected aria-disabled to be set to "false" by default.');
+
+      fixture.componentInstance.disabled = true;
+      fixture.detectChanges();
+
+      expect(tabLinkElements.every(tabLink => tabLink.getAttribute('aria-disabled') === 'true'))
+        .toBe(true, 'Expected aria-disabled to be set to "true" if link is disabled.');
+    });
+
+    it('should update the disableRipple property on each tab link', () => {
+      const tabLinkElements = fixture.debugElement.queryAll(By.directive(MdTabLink))
+        .map(tabLinkDebug => tabLinkDebug.componentInstance) as MdTabLink[];
+
+      expect(tabLinkElements.every(tabLink => !tabLink.disableRipple))
+        .toBe(true, 'Expected every tab link to have ripples enabled');
+
+      fixture.componentInstance.disableRipple = true;
+      fixture.detectChanges();
+
+      expect(tabLinkElements.every(tabLink => tabLink.disableRipple))
+        .toBe(true, 'Expected every tab link to have ripples disabled');
+    });
+
+    it('should update the tabindex if links are disabled', () => {
+      const tabLinkElements = fixture.debugElement.queryAll(By.css('a'))
+        .map(tabLinkDebugEl => tabLinkDebugEl.nativeElement);
+
+      expect(tabLinkElements.every(tabLink => tabLink.tabIndex === 0))
+        .toBe(true, 'Expected element to be keyboard focusable by default');
+
+      fixture.componentInstance.disabled = true;
+      fixture.detectChanges();
+
+      expect(tabLinkElements.every(tabLink => tabLink.tabIndex === -1))
+        .toBe(true, 'Expected element to no longer be keyboard focusable if disabled.');
+    });
+
+    it('should show ripples for tab links', () => {
+      const tabLink = fixture.debugElement.nativeElement.querySelector('.mat-tab-link');
+
+      dispatchMouseEvent(tabLink, 'mousedown');
+      dispatchMouseEvent(tabLink, 'mouseup');
+
+      expect(tabLink.querySelectorAll('.mat-ripple-element').length)
+        .toBe(1, 'Expected one ripple to show up if user clicks on tab link.');
+    });
+
+    it('should be able to disable ripples on a tab link', () => {
+      const tabLinkDebug = fixture.debugElement.query(By.css('a'));
+      const tabLinkElement = tabLinkDebug.nativeElement;
+      const tabLinkInstance = tabLinkDebug.injector.get(MdTabLink);
+
+      tabLinkInstance.disableRipple = true;
+
+      dispatchMouseEvent(tabLinkElement, 'mousedown');
+      dispatchMouseEvent(tabLinkElement, 'mouseup');
+
+      expect(tabLinkElement.querySelectorAll('.mat-ripple-element').length)
+        .toBe(0, 'Expected no ripple to show up if ripples are disabled.');
     });
 
     it('should re-align the ink bar when the direction changes', () => {
@@ -62,6 +140,31 @@ describe('MdTabNavBar', () => {
       fixture.detectChanges();
 
       expect(inkBar.alignToElement).toHaveBeenCalled();
+    });
+
+    it('should re-align the ink bar when the tabs list change', () => {
+      const inkBar = fixture.componentInstance.tabNavBar._inkBar;
+
+      spyOn(inkBar, 'alignToElement');
+
+      fixture.componentInstance.tabs = [1, 2, 3, 4];
+      fixture.detectChanges();
+
+      expect(inkBar.alignToElement).toHaveBeenCalled();
+    });
+
+    it('should re-align the ink bar when the tab labels change the width', done => {
+      const inkBar = fixture.componentInstance.tabNavBar._inkBar;
+
+      const spy = spyOn(inkBar, 'alignToElement').and.callFake(() => {
+        expect(spy.calls.any()).toBe(true);
+        done();
+      });
+
+      fixture.componentInstance.label = 'label change';
+      fixture.detectChanges();
+
+      expect(spy.calls.any()).toBe(false);
     });
 
     it('should re-align the ink bar when the window is resized', fakeAsync(() => {
@@ -96,15 +199,24 @@ describe('MdTabNavBar', () => {
 @Component({
   selector: 'test-app',
   template: `
-    <nav md-tab-nav-bar>
-      <a md-tab-link [active]="activeIndex === 0" (click)="activeIndex = 0">Tab One</a>
-      <a md-tab-link [active]="activeIndex === 1" (click)="activeIndex = 1">Tab Two</a>
-      <a md-tab-link [active]="activeIndex === 2" (click)="activeIndex = 2">Tab Three</a>
+    <nav md-tab-nav-bar [disableRipple]="disableRipple">
+      <a md-tab-link
+         *ngFor="let tab of tabs; let index = index"
+         [active]="activeIndex === index"
+         [disabled]="disabled"
+         (click)="activeIndex = index">
+        Tab link {{label}}
+      </a>
     </nav>
   `
 })
 class SimpleTabNavBarTestApp {
-  @ViewChild(MdTabNavBar) tabNavBar: MdTabNavBar;
+  @ViewChild(MdTabNav) tabNavBar: MdTabNav;
+
+  label = '';
+  disabled: boolean = false;
+  disableRipple: boolean = false;
+  tabs = [0, 1, 2];
 
   activeIndex = 0;
 }

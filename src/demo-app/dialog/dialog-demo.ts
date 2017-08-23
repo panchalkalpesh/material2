@@ -1,6 +1,6 @@
 import {Component, Inject, ViewChild, TemplateRef} from '@angular/core';
 import {DOCUMENT} from '@angular/platform-browser';
-import {MdDialog, MdDialogRef, MdDialogConfig, MD_DIALOG_DATA} from '@angular/material';
+import {MdDialog, MdDialogRef, MD_DIALOG_DATA} from '@angular/material';
 
 
 @Component({
@@ -10,11 +10,13 @@ import {MdDialog, MdDialogRef, MdDialogConfig, MD_DIALOG_DATA} from '@angular/ma
   styleUrls: ['dialog-demo.css'],
 })
 export class DialogDemo {
-  dialogRef: MdDialogRef<JazzDialog>;
-  lastCloseResult: string;
+  dialogRef: MdDialogRef<JazzDialog> | null;
+  lastAfterClosedResult: string;
+  lastBeforeCloseResult: string;
   actionsAlignment: string;
-  config: MdDialogConfig = {
+  config = {
     disableClose: false,
+    panelClass: 'custom-overlay-pane-class',
     hasBackdrop: true,
     backdropClass: '',
     width: '',
@@ -37,7 +39,7 @@ export class DialogDemo {
     // Possible useful example for the open and closeAll events.
     // Adding a class to the body if a dialog opens and
     // removing it after all open dialogs are closed
-    dialog.afterOpen.subscribe((ref: MdDialogRef<any>) => {
+    dialog.afterOpen.subscribe(() => {
       if (!doc.body.classList.contains('no-scroll')) {
         doc.body.classList.add('no-scroll');
       }
@@ -50,8 +52,11 @@ export class DialogDemo {
   openJazz() {
     this.dialogRef = this.dialog.open(JazzDialog, this.config);
 
+    this.dialogRef.beforeClose().subscribe((result: string) => {
+      this.lastBeforeCloseResult = result;
+    });
     this.dialogRef.afterClosed().subscribe((result: string) => {
-      this.lastCloseResult = result;
+      this.lastAfterClosedResult = result;
       this.dialogRef = null;
     });
   }
@@ -72,7 +77,11 @@ export class DialogDemo {
   selector: 'demo-jazz-dialog',
   template: `
   <p>It's Jazz!</p>
-  <p><label>How much? <input #howMuch></label></p>
+
+  <md-form-field>
+    <input mdInput placeholder="How much?" #howMuch>
+  </md-form-field>
+
   <p> {{ data.message }} </p>
   <button type="button" (click)="dialogRef.close(howMuch.value)">Close dialog</button>
   <button (click)="togglePosition()">Change dimensions</button>`

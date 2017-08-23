@@ -1,6 +1,17 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {NgModule} from '@angular/core';
-import {OverlayModule, PortalModule, MdCommonModule, LIVE_ANNOUNCER_PROVIDER} from '../core';
 import {CommonModule} from '@angular/common';
+import {OverlayModule} from '@angular/cdk/overlay';
+import {PortalModule} from '@angular/cdk/portal';
+import {LIVE_ANNOUNCER_PROVIDER} from '@angular/cdk/a11y';
+import {MdCommonModule} from '../core';
 import {MdSnackBar} from './snack-bar';
 import {MdSnackBarContainer} from './snack-bar-container';
 import {SimpleSnackBar} from './simple-snack-bar';

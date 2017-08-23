@@ -38,11 +38,6 @@ $mat-mini-fab-padding: 8px !default;
   white-space: nowrap;
   text-decoration: none;
   vertical-align: baseline;
-
-  // Typography.
-  font-size: $mat-body-font-size-base;
-  font-family: $mat-font-family;
-  font-weight: 500;
   text-align: center;
 
   // Sizing.
@@ -109,8 +104,9 @@ $mat-mini-fab-padding: 8px !default;
     @include mat-elevation(12);
   }
 
-  i, .mat-icon {
+  .mat-button-wrapper {
     padding: $padding 0;
+    display: inline-block;
     line-height: $mat-icon-button-line-height;
   }
 }

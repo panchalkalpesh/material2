@@ -124,6 +124,34 @@ class ConfigBuilder {
 }
 ```
 
+#### RxJS
+When dealing with RxJS operators, import the operator functions directly (e.g.
+`import "rxjs/operator/map"`), as opposed to using the "patch" imports which pollute the user's
+global Observable object (e.g. `import "rxjs/add/operator/map"`):
+
+```ts
+// NO
+import 'rxjs/add/operator/map';
+someObservable.map(...).subscribe(...);
+
+// YES
+import {map} from 'rxjs/operator/map';
+map.call(someObservable, ...).subscribe(...);
+```
+
+Note that this approach can be inflexible when dealing with long chains of operators. You can use
+the `RxChain` class to help with it:
+
+```ts
+// Before
+someObservable.filter(...).map(...).do(...);
+
+// After
+RxChain.from(someObservable).call(filter, ...).call(map, ...).call(do, ...).subscribe(...);
+```
+Note that not all operators are available via the `RxChain`. If the operator that you need isn't
+declared, you can add it to `/core/rxjs/rx-operators.ts`.
+
 #### Access modifiers
 * Omit the `public` keyword as it is the default behavior.
 * Use `private` when appropriate and possible, prefixing the name with an underscore.
@@ -139,7 +167,7 @@ API docs.
 
 #### JsDoc comments
 
-All public APIs must have user-facing comments. These are extracted and shown in the documation
+All public APIs must have user-facing comments. These are extracted and shown in the documentation
 on [material.angular.io](https://material.angular.io).
 
 Private and internal APIs should have JsDoc when they are not obvious. Ultimately it is the purview
@@ -213,7 +241,7 @@ activateRipple() {
 
 #### Inheritance
 
-Avoid using inheritence to apply reusable behaviors to multiple components. This limits how many
+Avoid using inheritance to apply reusable behaviors to multiple components. This limits how many
 behaviors can be composed.
 
 ### Angular
@@ -279,7 +307,7 @@ This makes it easier to override styles when necessary. For example, rather than
 ```scss
 the-host-element {
   // ...
- 
+
   .some-child-element {
     color: red;
   }

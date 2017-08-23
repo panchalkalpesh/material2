@@ -5,6 +5,8 @@
     "declaration": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "noUnusedParameters": true,
+    "strictNullChecks": true,
     "lib": ["es6", "es2015", "dom"],
     "module": "commonjs",
     "moduleResolution": "node",
@@ -20,7 +22,7 @@
     "baseUrl": ".",
     "paths": {
       "@angular/material": ["../../dist/packages/material/public_api"],
-      "@angular/cdk": ["../../dist/packages/cdk/public_api"]
+      "@angular/cdk/*": ["../../dist/packages/cdk/*"]
     }
   },
   "files": [

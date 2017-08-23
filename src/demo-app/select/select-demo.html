@@ -1,11 +1,14 @@
-<div style="height: 1000px">This div is for testing scrolled selects.</div>
+Space above cards: <input type="number" [formControl]="topHeightCtrl">
 <button md-button (click)="showSelect=!showSelect">SHOW SELECT</button>
+<div [style.height.px]="topHeightCtrl.value"></div>
+
 <div class="demo-select">
   <md-card>
     <md-card-subtitle>ngModel</md-card-subtitle>
 
-    <md-select placeholder="Drink" [color]="drinksTheme" [(ngModel)]="currentDrink" [required]="drinksRequired" [disabled]="drinksDisabled"
-      [floatPlaceholder]="floatPlaceholder" #drinkControl="ngModel">
+    <md-select placeholder="Drink" [color]="drinksTheme" [(ngModel)]="currentDrink" [required]="drinksRequired"
+      [disabled]="drinksDisabled" [floatPlaceholder]="floatPlaceholder" #drinkControl="ngModel">
+      <md-option>None</md-option>
       <md-option *ngFor="let drink of drinks" [value]="drink.value" [disabled]="drink.disabled">
         {{ drink.viewValue }}
       </md-option>
@@ -59,6 +62,66 @@
       <button md-button (click)="pokemonRequired=!pokemonRequired">TOGGLE REQUIRED</button>
       <button md-button (click)="pokemonDisabled=!pokemonDisabled">TOGGLE DISABLED</button>
       <button md-button (click)="pokemonControl.reset()">RESET</button>
+    </md-card-content>
+  </md-card>
+
+  <md-card>
+    <md-card-subtitle>Without Angular forms</md-card-subtitle>
+
+    <md-select placeholder="Digimon" [(value)]="currentDigimon">
+      <md-option>None</md-option>
+      <md-option *ngFor="let creature of digimon" [value]="creature.value">
+        {{ creature.viewValue }}
+      </md-option>
+    </md-select>
+
+    <p>Value: {{ currentDigimon }}</p>
+
+    <button md-button (click)="currentDigimon='pajiramon-3'">SET VALUE</button>
+    <button md-button (click)="currentDigimon=null">RESET</button>
+  </md-card>
+
+  <md-card>
+    <md-card-subtitle>Option groups</md-card-subtitle>
+
+    <md-card-content>
+      <md-select placeholder="Pokemon" [(ngModel)]="currentPokemonFromGroup">
+        <md-optgroup *ngFor="let group of pokemonGroups" [label]="group.name"
+          [disabled]="group.disabled">
+          <md-option *ngFor="let creature of group.pokemon" [value]="creature.value">
+            {{ creature.viewValue }}
+          </md-option>
+        </md-optgroup>
+      </md-select>
+    </md-card-content>
+  </md-card>
+
+
+  <md-card>
+    <md-card-subtitle>compareWith</md-card-subtitle>
+    <md-card-content>
+      <md-select placeholder="Drink" [color]="drinksTheme"
+                 [(ngModel)]="currentDrinkObject"
+                 [required]="drinkObjectRequired"
+                 [compareWith]="compareByValue ? compareDrinkObjectsByValue : compareByReference"
+                 #drinkObjectControl="ngModel">
+        <md-option *ngFor="let drink of drinks" [value]="drink" [disabled]="drink.disabled">
+          {{ drink.viewValue }}
+        </md-option>
+      </md-select>
+      <p> Value: {{ currentDrinkObject | json }} </p>
+      <p> Touched: {{ drinkObjectControl.touched }} </p>
+      <p> Dirty: {{ drinkObjectControl.dirty }} </p>
+      <p> Status: {{ drinkObjectControl.control?.status }} </p>
+      <p> Comparison Mode: {{ compareByValue ? 'VALUE' : 'REFERENCE' }} </p>
+
+      <button md-button (click)="reassignDrinkByCopy()"
+              mdTooltip="This action should clear the display value when comparing by reference.">
+        REASSIGN DRINK BY COPY
+      </button>
+      <button md-button (click)="drinkObjectRequired=!drinkObjectRequired">TOGGLE REQUIRED</button>
+      <button md-button (click)="compareByValue=!compareByValue">TOGGLE COMPARE BY VALUE</button>
+      <button md-button (click)="drinkObjectControl.reset()">RESET</button>
     </md-card-content>
   </md-card>
 

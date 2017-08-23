@@ -1,9 +1,9 @@
-import {createPackageBuildTasks} from './util/package-tasks';
+import {createPackageBuildTasks} from 'material2-build-tools';
+import {cdkPackage, examplesPackage, materialPackage} from './packages';
 
-/** Create gulp tasks to build the different packages in the project. */
-createPackageBuildTasks('cdk');
-createPackageBuildTasks('material', ['cdk']);
-createPackageBuildTasks('material-examples', ['material']);
+createPackageBuildTasks(cdkPackage);
+createPackageBuildTasks(materialPackage);
+createPackageBuildTasks(examplesPackage);
 
 import './tasks/ci';
 import './tasks/clean';
@@ -14,8 +14,12 @@ import './tasks/e2e';
 import './tasks/lint';
 import './tasks/publish';
 import './tasks/screenshots';
+import './tasks/examples';
 import './tasks/unit-test';
 import './tasks/aot';
 import './tasks/payload';
 import './tasks/coverage';
 import './tasks/material-release';
+import './tasks/universal';
+import './tasks/validate-release';
+import './tasks/changelog';

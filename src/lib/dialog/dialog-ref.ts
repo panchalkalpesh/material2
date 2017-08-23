@@ -1,15 +1,24 @@
-import {OverlayRef, GlobalPositionStrategy} from '../core';
-import {AnimationEvent} from '@angular/animations';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+import {OverlayRef, GlobalPositionStrategy} from '@angular/cdk/overlay';
+import {filter, first, RxChain} from '@angular/cdk/rxjs';
 import {DialogPosition} from './dialog-config';
 import {Observable} from 'rxjs/Observable';
 import {Subject} from 'rxjs/Subject';
 import {MdDialogContainer} from './dialog-container';
-import 'rxjs/add/operator/filter';
 
 
 // TODO(jelbourn): resizing
-// TODO(jelbourn): afterOpen and beforeClose
+// TODO(jelbourn): afterOpen
 
+// Counter for unique dialog ids.
+let uniqueId = 0;
 
 /**
  * Reference to a dialog opened via the MdDialog service.
@@ -18,21 +27,31 @@ export class MdDialogRef<T> {
   /** The instance of component opened into the dialog. */
   componentInstance: T;
 
+  /** Whether the user is allowed to close the dialog. */
+  disableClose = this._containerInstance._config.disableClose;
+
   /** Subject for notifying the user that the dialog has finished closing. */
   private _afterClosed: Subject<any> = new Subject();
+
+  /** Subject for notifying the user that the dialog has started closing. */
+  private _beforeClose: Subject<any> = new Subject();
 
   /** Result to be passed to afterClosed. */
   private _result: any;
 
-  constructor(private _overlayRef: OverlayRef, public _containerInstance: MdDialogContainer) {
-    _containerInstance._onAnimationStateChange
-      .filter((event: AnimationEvent) => event.toState === 'exit')
+  constructor(
+    private _overlayRef: OverlayRef,
+    private _containerInstance: MdDialogContainer,
+    public readonly id: string = `md-dialog-${uniqueId++}`) {
+
+    RxChain.from(_containerInstance._animationStateChanged)
+      .call(filter, event => event.phaseName === 'done' && event.toState === 'exit')
+      .call(first)
       .subscribe(() => {
         this._overlayRef.dispose();
-        this.componentInstance = null;
-      }, null, () => {
         this._afterClosed.next(this._result);
         this._afterClosed.complete();
+        this.componentInstance = null!;
       });
   }
 
@@ -42,8 +61,18 @@ export class MdDialogRef<T> {
    */
   close(dialogResult?: any): void {
     this._result = dialogResult;
-    this._containerInstance._state = 'exit';
-    this._overlayRef.detachBackdrop(); // Transition the backdrop in parallel with the dialog.
+
+    // Transition the backdrop in parallel to the dialog.
+    RxChain.from(this._containerInstance._animationStateChanged)
+      .call(filter, event => event.phaseName === 'start')
+      .call(first)
+      .subscribe(() => {
+        this._beforeClose.next(dialogResult);
+        this._beforeClose.complete();
+        this._overlayRef.detachBackdrop();
+      });
+
+    this._containerInstance._startExitAnimation();
   }
 
   /**
@@ -51,6 +80,20 @@ export class MdDialogRef<T> {
    */
   afterClosed(): Observable<any> {
     return this._afterClosed.asObservable();
+  }
+
+  /**
+   * Gets an observable that is notified when the dialog has started closing.
+   */
+  beforeClose(): Observable<any> {
+    return this._beforeClose.asObservable();
+  }
+
+  /**
+   * Gets an observable that emits when the overlay's backdrop has been clicked.
+   */
+  backdropClick(): Observable<void> {
+    return this._overlayRef.backdropClick();
   }
 
   /**
@@ -86,6 +129,11 @@ export class MdDialogRef<T> {
     this._getPositionStrategy().width(width).height(height);
     this._overlayRef.updatePosition();
     return this;
+  }
+
+  /** Returns whether the dialog is animating. */
+  _isAnimating(): boolean {
+    return this._containerInstance._isAnimating;
   }
 
   /** Fetches the position strategy object from the overlay ref. */

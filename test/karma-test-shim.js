@@ -1,6 +1,10 @@
 /*global jasmine, __karma__, window*/
 Error.stackTraceLimit = Infinity;
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 3000;
+
+// The default time that jasmine waits for an asynchronous test to finish is five seconds.
+// If this timeout is too short the CI may fail randomly because our asynchronous tests can
+// take longer in some situations (e.g Saucelabs and Browserstack tunnels)
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
 
 __karma__.loaded = function () {};
 
@@ -42,8 +46,22 @@ System.config({
       'node:@angular/platform-browser-dynamic/bundles/platform-browser-dynamic-testing.umd.js',
 
     // Path mappings for local packages that can be imported inside of tests.
-    '@angular/material': 'dist/bundles/material.umd.js',
-    '@angular/cdk': 'dist/bundles/cdk.umd.js',
+    // TODO(devversion): replace once the index.ts file for the Material package has been added.
+    '@angular/material': 'dist/packages/material/public_api.js',
+    '@angular/cdk': 'dist/packages/cdk/index.js',
+    '@angular/cdk/a11y': 'dist/packages/cdk/a11y/index.js',
+    '@angular/cdk/bidi': 'dist/packages/cdk/bidi/index.js',
+    '@angular/cdk/coercion': 'dist/packages/cdk/coercion/index.js',
+    '@angular/cdk/collections': 'dist/packages/cdk/collections/index.js',
+    '@angular/cdk/keycodes': 'dist/packages/cdk/keycodes/index.js',
+    '@angular/cdk/observers': 'dist/packages/cdk/observers/index.js',
+    '@angular/cdk/overlay': 'dist/packages/cdk/overlay/index.js',
+    '@angular/cdk/platform': 'dist/packages/cdk/platform/index.js',
+    '@angular/cdk/portal': 'dist/packages/cdk/portal/index.js',
+    '@angular/cdk/rxjs': 'dist/packages/cdk/rxjs/index.js',
+    '@angular/cdk/scrolling': 'dist/packages/cdk/scrolling/index.js',
+    '@angular/cdk/table': 'dist/packages/cdk/table/index.js',
+    '@angular/cdk/testing': 'dist/packages/cdk/testing/index.js',
   },
   packages: {
     // Thirdparty barrels.
@@ -85,11 +103,50 @@ function configureTestBed() {
     var testing = providers[0];
     var testingBrowser = providers[1];
 
-    jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000;
-
-    testing.TestBed.initTestEnvironment(
+    var testBed = testing.TestBed.initTestEnvironment(
       testingBrowser.BrowserDynamicTestingModule,
       testingBrowser.platformBrowserDynamicTesting()
     );
+
+    patchTestBedToDestroyFixturesAfterEveryTest(testBed);
+  });
+}
+
+/**
+ * Monkey-patches TestBed.resetTestingModule such that any errors that occur during component
+ * destruction are thrown instead of silently logged. Also runs TestBed.resetTestingModule after
+ * each unit test.
+ *
+ * Without this patch, the combination of two behaviors is problematic for Angular Material:
+ * - TestBed.resetTestingModule catches errors thrown on fixture destruction and logs them without
+ *     the errors ever being thrown. This means that any component errors that occur in ngOnDestroy
+ *     can encounter errors silently and still pass unit tests.
+ * - TestBed.resetTestingModule is only called *before* a test is run, meaning that even *if* the
+ *    aforementioned errors were thrown, they would be reported for the wrong test (the test that's
+ *    about to start, not the test that just finished).
+ */
+function patchTestBedToDestroyFixturesAfterEveryTest(testBed) {
+  // Original resetTestingModule function of the TestBed.
+  var _resetTestingModule = testBed.resetTestingModule;
+
+  // Monkey-patch the resetTestingModule to destroy fixtures outside of a try/catch block.
+  // With https://github.com/angular/angular/commit/2c5a67134198a090a24f6671dcdb7b102fea6eba
+  // errors when destroying components are no longer causing Jasmine to fail.
+  testBed.resetTestingModule = function() {
+    try {
+      this._activeFixtures.forEach(function (fixture) { fixture.destroy(); });
+    } finally {
+      this._activeFixtures = [];
+      // Regardless of errors or not, run the original reset testing module function.
+      _resetTestingModule.call(this);
+    }
+  };
+
+  // Angular's testing package resets the testing module before each test. This doesn't work well
+  // for us because it doesn't allow developers to see what test actually failed.
+  // Fixing this by resetting the testing module after each test.
+  // https://github.com/angular/angular/blob/master/packages/core/testing/src/before_each.ts#L25
+  afterEach(function() {
+    testBed.resetTestingModule();
   });
 }

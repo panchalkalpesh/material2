@@ -1,30 +1,35 @@
 import {task, src, dest} from 'gulp';
 import {join} from 'path';
-import {writeFileSync} from 'fs';
+import {writeFileSync, mkdirpSync} from 'fs-extra';
 import {Bundler} from 'scss-bundle';
-import {execNodeTask, sequenceTask} from '../util/task_helpers';
-import {composeRelease} from '../util/package-build';
-import {COMPONENTS_DIR, DIST_MATERIAL, DIST_RELEASES} from '../constants';
+import {composeRelease, buildConfig, sequenceTask} from 'material2-build-tools';
+import {materialPackage} from '../packages';
 
 // There are no type definitions available for these imports.
 const gulpRename = require('gulp-rename');
 
+const {outputDir} = buildConfig;
+const {packageRoot, packageOut} = materialPackage;
+
+/** Path to the directory where all releases are created. */
+const releasesDir = join(outputDir, 'releases');
+
 // Path to the release output of material.
-const releasePath = join(DIST_RELEASES, 'material');
+const releasePath = join(releasesDir, 'material');
 // The entry-point for the scss theming bundle.
-const themingEntryPointPath = join(COMPONENTS_DIR, 'core', 'theming', '_all-theme.scss');
+const themingEntryPointPath = join(packageRoot, 'core', 'theming', '_all-theme.scss');
 // Output path for the scss theming bundle.
 const themingBundlePath = join(releasePath, '_theming.scss');
 // Matches all pre-built theme css files
-const prebuiltThemeGlob = join(DIST_MATERIAL, '**/theming/prebuilt/*.css');
+const prebuiltThemeGlob = join(packageOut, '**/theming/prebuilt/*.css?(.map)');
 // Matches all SCSS files in the library.
-const allScssGlob = join(COMPONENTS_DIR, '**/*.scss');
+const allScssGlob = join(packageRoot, '**/*.scss');
 
 /**
  * Overwrite the release task for the material package. The material release will include special
  * files, like a bundled theming SCSS file or all prebuilt themes.
  */
-task('material:build-release', ['material:prepare-release'], () => composeRelease('material'));
+task('material:build-release', ['material:prepare-release'], () => composeRelease(materialPackage));
 
 /**
  * Task that will build the material package. It will also copy all prebuilt themes and build
@@ -47,7 +52,10 @@ task('material:bundle-theming-scss', () => {
   // Instantiates the SCSS bundler and bundles all imports of the specified entry point SCSS file.
   // A glob of all SCSS files in the library will be passed to the bundler. The bundler takes an
   // array of globs, which will match SCSS files that will be only included once in the bundle.
-  new Bundler().Bundle(themingEntryPointPath, [allScssGlob]).then(result => {
+  return new Bundler().Bundle(themingEntryPointPath, [allScssGlob]).then(result => {
+    // The release directory is not created yet because the composing of the release happens when
+    // this task finishes.
+    mkdirpSync(releasePath);
     writeFileSync(themingBundlePath, result.bundledContent);
   });
 });

@@ -1,22 +1,41 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {NgModule} from '@angular/core';
+import {A11yModule} from '@angular/cdk/a11y';
+import {BidiModule} from '@angular/cdk/bidi';
+import {ObserversModule} from '@angular/cdk/observers';
+import {OverlayModule} from '@angular/cdk/overlay';
+import {PortalModule} from '@angular/cdk/portal';
 import {MdLineModule} from './line/line';
-import {RtlModule} from './rtl/dir';
-import {ObserveContentModule} from './observe-content/observe-content';
-import {MdOptionModule} from './option/option';
-import {PortalModule} from './portal/portal-directives';
-import {OverlayModule} from './overlay/overlay-directives';
-import {A11yModule} from './a11y/index';
-import {MdSelectionModule} from './selection/index';
+import {MdOptionModule} from './option/index';
+import {MdPseudoCheckboxModule} from './selection/index';
 import {MdRippleModule} from './ripple/index';
 
+// Re-exports of the CDK to avoid breaking changes.
+export {
+  coerceBooleanProperty,
+  coerceNumberProperty,
+} from '@angular/cdk/coercion';
+
+export {
+  ObserversModule,
+  ObserveContent,
+} from '@angular/cdk/observers';
+
+export {
+  SelectionModel
+} from '@angular/cdk/collections';
 
 // RTL
-export {Dir, LayoutDirection, RtlModule} from './rtl/dir';
+export {Dir, Direction, Directionality, BidiModule} from './bidi/index';
 
-// Mutation Observer
-export {ObserveContentModule, ObserveContent} from './observe-content/observe-content';
-
-export {MdOptionModule, MdOption, MdOptionSelectionChange} from './option/option';
+export * from './option/index';
 
 // Portals
 export {
@@ -34,10 +53,10 @@ export {
 export {DomPortalHost} from './portal/dom-portal-host';
 
 // Platform
-export * from './platform/index';
+export * from '@angular/cdk/platform';
 
 // Overlay
-export * from './overlay/index';
+export * from '@angular/cdk/overlay';
 
 // Gestures
 export {GestureConfig} from './gestures/gesture-config';
@@ -54,16 +73,14 @@ export {
   LiveAnnouncer,
   LIVE_ANNOUNCER_ELEMENT_TOKEN,
   LIVE_ANNOUNCER_PROVIDER,
-} from './a11y/live-announcer';
-
-// Selection
-export * from './selection/selection';
-
-export * from './a11y/focus-trap';
-export {InteractivityChecker} from './a11y/interactivity-checker';
-export {isFakeMousedownFromScreenReader} from './a11y/fake-mousedown';
-
-export {A11yModule} from './a11y/index';
+  InteractivityChecker,
+  FocusTrap,
+  FocusTrapFactory,
+  FocusTrapDeprecatedDirective,
+  FocusTrapDirective,
+  isFakeMousedownFromScreenReader,
+  A11yModule,
+} from '@angular/cdk/a11y';
 
 export {
   UniqueSelectionDispatcher,
@@ -76,12 +93,6 @@ export {MdLineModule, MdLine, MdLineSetter} from './line/line';
 // Style
 export * from './style/index';
 
-// Error
-export {MdError} from './errors/error';
-
-// Misc
-export {ComponentType} from './overlay/generic-component-type';
-
 // Keybindings
 export * from './keyboard/keycodes';
 
@@ -93,41 +104,53 @@ export * from './animation/animation';
 // Selection
 export * from './selection/index';
 
-// Coercion
-export {coerceBooleanProperty} from './coercion/boolean-property';
-export {coerceNumberProperty} from './coercion/number-property';
-
 // Compatibility
 export {CompatibilityModule, NoConflictStyleCompatibilityMode} from './compatibility/compatibility';
 
 // Common material module
-export {MdCommonModule} from './common-behaviors/common-module';
+export {MdCommonModule, MATERIAL_SANITY_CHECKS} from './common-behaviors/common-module';
 
 // Datetime
 export * from './datetime/index';
 
+// Placeholder
+export {
+  FloatPlaceholderType,
+  PlaceholderOptions,
+  MD_PLACEHOLDER_GLOBAL_OPTIONS
+} from './placeholder/placeholder-options';
+
+// Error
+export {
+  ErrorStateMatcher,
+  ErrorOptions,
+  MD_ERROR_GLOBAL_OPTIONS,
+  defaultErrorStateMatcher,
+  showOnDirtyErrorStateMatcher
+} from './error/error-options';
+
 @NgModule({
   imports: [
     MdLineModule,
-    RtlModule,
+    BidiModule,
     MdRippleModule,
-    ObserveContentModule,
+    ObserversModule,
     PortalModule,
     OverlayModule,
     A11yModule,
     MdOptionModule,
-    MdSelectionModule,
+    MdPseudoCheckboxModule,
   ],
   exports: [
     MdLineModule,
-    RtlModule,
+    BidiModule,
     MdRippleModule,
-    ObserveContentModule,
+    ObserversModule,
     PortalModule,
     OverlayModule,
     A11yModule,
     MdOptionModule,
-    MdSelectionModule,
+    MdPseudoCheckboxModule,
   ],
 })
 export class MdCoreModule {}

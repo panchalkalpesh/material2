@@ -1,3 +1,11 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {
   AfterContentInit,
   ChangeDetectionStrategy,
@@ -57,7 +65,10 @@ export class MdMonthView<D> implements AfterContentInit {
   @Input() dateFilter: (date: D) => boolean;
 
   /** Emits when a new date is selected. */
-  @Output() selectedChange = new EventEmitter<D>();
+  @Output() selectedChange = new EventEmitter<D | null>();
+
+  /** Emits when any date is selected. */
+  @Output() userSelection = new EventEmitter<void>();
 
   /** The label for this month (e.g. "January 2017"). */
   _monthLabel: string;
@@ -72,10 +83,10 @@ export class MdMonthView<D> implements AfterContentInit {
    * The date of the month that the currently selected Date falls on.
    * Null if the currently selected Date is in another month.
    */
-  _selectedDate: number;
+  _selectedDate: number | null;
 
   /** The date of the month that today falls on. Null if today is in another month. */
-  _todayDate: number;
+  _todayDate: number | null;
 
   /** The names of the weekdays. */
   _weekdays: {long: string, narrow: string}[];
@@ -108,12 +119,15 @@ export class MdMonthView<D> implements AfterContentInit {
 
   /** Handles when a new date is selected. */
   _dateSelected(date: number) {
-    if (this._selectedDate == date) {
-      return;
+    if (this._selectedDate != date) {
+      const selectedYear = this._dateAdapter.getYear(this.activeDate);
+      const selectedMonth = this._dateAdapter.getMonth(this.activeDate);
+      const selectedDate = this._dateAdapter.createDate(selectedYear, selectedMonth, date);
+
+      this.selectedChange.emit(selectedDate);
     }
-    this.selectedChange.emit(this._dateAdapter.createDate(
-        this._dateAdapter.getYear(this.activeDate), this._dateAdapter.getMonth(this.activeDate),
-        date));
+
+    this.userSelection.emit();
   }
 
   /** Initializes this month view. */
@@ -158,7 +172,7 @@ export class MdMonthView<D> implements AfterContentInit {
    * Gets the date in this month that the given Date falls on.
    * Returns null if the given Date is in another month.
    */
-  private _getDateInCurrentMonth(date: D): number {
+  private _getDateInCurrentMonth(date: D): number | null {
     return this._hasSameMonthAndYear(date, this.activeDate) ?
         this._dateAdapter.getDate(date) : null;
   }

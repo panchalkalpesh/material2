@@ -4,13 +4,21 @@
 {
   "extends": "./tsconfig-build",
   "compilerOptions": {
+    "importHelpers": false,
     "module": "commonjs",
     "target": "es5",
     "types": ["jasmine"],
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "paths": {
+      "@angular/cdk/*": ["./*"]
+    }
   },
-  "include": [
-    "**/*.spec.ts"
+  "files": [
+    "./testing/index.ts"
   ],
-  "files": null
+  "include": [
+    // Include the index.ts for each secondary entry-point
+    "./*/index.ts",
+    "**/*.spec.ts"
+  ]
 }

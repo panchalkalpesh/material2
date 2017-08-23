@@ -15,7 +15,7 @@
     <input #myinput>
   </md-sidenav>
 
-  <md-sidenav #end align="end">
+  <md-sidenav #end position="end">
     End Side Drawer
     <br>
     <button md-button (click)="end.close()">Close</button>
@@ -48,16 +48,40 @@
   </div>
 </md-sidenav-container>
 
-<h2>Dynamic Alignment Sidenav</h2>
+<h2>Dynamic Position Sidenav</h2>
 
 <md-sidenav-container class="demo-sidenav-container">
-  <md-sidenav #dynamicAlignSidenav1 mode="side" [align]="invert ? 'end' : 'start'">Start</md-sidenav>
-  <md-sidenav #dynamicAlignSidenav2 mode="side" [align]="invert ? 'start' : 'end'">End</md-sidenav>
+  <md-sidenav #dynamicPosSidenav1 mode="side" [position]="invert ? 'end' : 'start'">Start</md-sidenav>
+  <md-sidenav #dynamicPosSidenav2 mode="side" [position]="invert ? 'start' : 'end'">End</md-sidenav>
 
   <div class="demo-sidenav-content">
-    <button (click)="dynamicAlignSidenav1.toggle(); dynamicAlignSidenav2.toggle()">
+    <button (click)="dynamicPosSidenav1.toggle(); dynamicPosSidenav2.toggle()">
       Toggle sidenavs
     </button>
     <button (click)="invert = !invert">Change sides</button>
+  </div>
+</md-sidenav-container>
+
+<h2>Sidenav with focus attributes</h2>
+
+<md-sidenav-container class="demo-sidenav-container">
+  <md-sidenav #focusSidenav>
+    <md-nav-list>
+      <a md-list-item routerLink>Link</a>
+      <a md-list-item routerLink cdk-focus-region-start>Focus region start</a>
+      <a md-list-item routerLink>Link</a>
+      <a md-list-item routerLink cdk-focus-initial>Initially focused</a>
+      <a md-list-item routerLink cdk-focus-region-end>Focus region end</a>
+      <a md-list-item routerLink>Link</a>
+    </md-nav-list>
+  </md-sidenav>
+
+  <div class="demo-sidenav-content">
+    <h1>My Content</h1>
+
+    <div>
+      <header>Sidenav</header>
+      <button md-button (click)="focusSidenav.toggle()">Toggle Drawer</button>
+    </div>
   </div>
 </md-sidenav-container>

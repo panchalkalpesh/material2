@@ -1,15 +1,20 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {NgModule} from '@angular/core';
 
-import {
-  MdRippleModule,
-  RtlModule,
-  ObserveContentModule,
-  PortalModule,
-  OverlayModule,
-  A11yModule,
-  MdCommonModule,
-} from './core/index';
+import {OverlayModule} from '@angular/cdk/overlay';
+import {A11yModule} from '@angular/cdk/a11y';
+import {BidiModule} from '@angular/cdk/bidi';
+import {ObserversModule} from '@angular/cdk/observers';
+import {PortalModule} from '@angular/cdk/portal';
 
+import {MdCommonModule, MdRippleModule} from './core';
 import {MdButtonToggleModule} from './button-toggle/index';
 import {MdButtonModule} from './button/index';
 import {MdCheckboxModule} from './checkbox/index';
@@ -36,6 +41,11 @@ import {PlatformModule} from './core/platform/index';
 import {MdAutocompleteModule} from './autocomplete/index';
 import {StyleModule} from './core/style/index';
 import {MdDatepickerModule} from './datepicker/index';
+import {MdExpansionModule} from './expansion/index';
+import {MdTableModule} from './table/index';
+import {MdSortModule} from './sort/index';
+import {MdPaginatorModule} from './paginator/index';
+import {MdFormFieldModule} from './form-field/index';
 
 const MATERIAL_MODULES = [
   MdAutocompleteModule,
@@ -45,12 +55,16 @@ const MATERIAL_MODULES = [
   MdChipsModule,
   MdCheckboxModule,
   MdDatepickerModule,
+  MdTableModule,
   MdDialogModule,
+  MdExpansionModule,
+  MdFormFieldModule,
   MdGridListModule,
   MdIconModule,
   MdInputModule,
   MdListModule,
   MdMenuModule,
+  MdPaginatorModule,
   MdProgressBarModule,
   MdProgressSpinnerModule,
   MdRadioModule,
@@ -60,17 +74,18 @@ const MATERIAL_MODULES = [
   MdSliderModule,
   MdSlideToggleModule,
   MdSnackBarModule,
+  MdSortModule,
   MdTabsModule,
   MdToolbarModule,
   MdTooltipModule,
   OverlayModule,
   PortalModule,
-  RtlModule,
+  BidiModule,
   StyleModule,
   A11yModule,
   PlatformModule,
   MdCommonModule,
-  ObserveContentModule,
+  ObserversModule
 ];
 
 /** @deprecated */

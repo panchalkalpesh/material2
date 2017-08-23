@@ -1,3 +1,11 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {NgModule} from '@angular/core';
 import {MdCommonModule} from '../core';
 import {MdIcon} from './icon';
@@ -14,5 +22,4 @@ export class MdIconModule {}
 
 
 export * from './icon';
-export * from './icon-errors';
 export * from './icon-registry';

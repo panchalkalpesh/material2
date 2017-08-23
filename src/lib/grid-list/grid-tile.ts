@@ -1,3 +1,11 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {
   Component,
   ViewEncapsulation,
@@ -6,7 +14,9 @@ import {
   Input,
   ContentChildren,
   QueryList,
-  AfterContentInit, Directive
+  AfterContentInit,
+  Directive,
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import {MdLine, MdLineSetter} from '../core';
 import {coerceToNumber} from './grid-list-measure';
@@ -15,12 +25,12 @@ import {coerceToNumber} from './grid-list-measure';
   moduleId: module.id,
   selector: 'md-grid-tile, mat-grid-tile',
   host: {
-    'role': 'listitem',
-    '[class.mat-grid-tile]': 'true',
+    'class': 'mat-grid-tile',
   },
   templateUrl: 'grid-tile.html',
   styleUrls: ['grid-list.css'],
   encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MdGridTile {
   _rowspan: number = 1;
@@ -50,7 +60,9 @@ export class MdGridTile {
 @Component({
   moduleId: module.id,
   selector: 'md-grid-tile-header, mat-grid-tile-header, md-grid-tile-footer, mat-grid-tile-footer',
-  templateUrl: 'grid-tile-text.html'
+  templateUrl: 'grid-tile-text.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
 })
 export class MdGridTileText implements AfterContentInit {
   /**
@@ -72,10 +84,8 @@ export class MdGridTileText implements AfterContentInit {
  * @docs-private
  */
 @Directive({
-  selector: '[md-grid-avatar], [mat-grid-avatar]',
-  host: {
-    '[class.mat-grid-avatar]': 'true'
-  }
+  selector: '[md-grid-avatar], [mat-grid-avatar], [mdGridAvatar], [matGridAvatar]',
+  host: {'class': 'mat-grid-avatar'}
 })
 export class MdGridAvatarCssMatStyler {}
 
@@ -85,9 +95,7 @@ export class MdGridAvatarCssMatStyler {}
  */
 @Directive({
   selector: 'md-grid-tile-header, mat-grid-tile-header',
-  host: {
-    '[class.mat-grid-tile-header]': 'true'
-  }
+  host: {'class': 'mat-grid-tile-header'}
 })
 export class MdGridTileHeaderCssMatStyler {}
 
@@ -97,8 +105,6 @@ export class MdGridTileHeaderCssMatStyler {}
  */
 @Directive({
   selector: 'md-grid-tile-footer, mat-grid-tile-footer',
-  host: {
-    '[class.mat-grid-tile-footer]': 'true'
-  }
+  host: {'class': 'mat-grid-tile-footer'}
 })
 export class MdGridTileFooterCssMatStyler {}

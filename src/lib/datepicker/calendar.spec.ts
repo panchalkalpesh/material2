@@ -1,15 +1,11 @@
-import {async, ComponentFixture, TestBed} from '@angular/core/testing';
+import {async, ComponentFixture, inject, TestBed} from '@angular/core/testing';
 import {Component} from '@angular/core';
 import {MdCalendar} from './calendar';
 import {By} from '@angular/platform-browser';
 import {MdMonthView} from './month-view';
 import {MdYearView} from './year-view';
 import {MdCalendarBody} from './calendar-body';
-import {
-  dispatchFakeEvent,
-  dispatchKeyboardEvent,
-  dispatchMouseEvent
-} from '../core/testing/dispatch-events';
+import {dispatchFakeEvent, dispatchKeyboardEvent, dispatchMouseEvent} from '@angular/cdk/testing';
 import {
   DOWN_ARROW,
   END,
@@ -23,18 +19,15 @@ import {
 } from '../core/keyboard/keycodes';
 import {MdDatepickerIntl} from './datepicker-intl';
 import {MdNativeDateModule} from '../core/datetime/index';
-
-
-// When constructing a Date, the month is zero-based. This can be confusing, since people are
-// used to seeing them one-based. So we create these aliases to make reading the tests easier.
-const JAN = 0, FEB = 1, MAR = 2, APR = 3, MAY = 4, JUN = 5, JUL = 6, AUG = 7, SEP = 8, OCT = 9,
-      NOV = 10, DEC = 11;
-
+import {NoConflictStyleCompatibilityMode} from '../core';
+import {MdButtonModule} from '../button/index';
+import {AUG, DEC, FEB, JAN, JUL, NOV, MAR, MAY, JUN, SEP} from '../core/testing/month-constants';
 
 describe('MdCalendar', () => {
   beforeEach(async(() => {
     TestBed.configureTestingModule({
       imports: [
+        MdButtonModule,
         MdNativeDateModule,
       ],
       declarations: [
@@ -154,6 +147,18 @@ describe('MdCalendar', () => {
       expect(calendarInstance._monthView).toBe(true, 'should be in month view');
       expect(testComponent.selected).toEqual(new Date(2017, JAN, 31));
     });
+
+    it('should re-render when the i18n labels have changed',
+      inject([MdDatepickerIntl], (intl: MdDatepickerIntl) => {
+        const button = fixture.debugElement.nativeElement
+            .querySelector('.mat-calendar-period-button');
+
+        intl.switchToYearViewLabel = 'Go to year view?';
+        intl.changes.next();
+        fixture.detectChanges();
+
+        expect(button.getAttribute('aria-label')).toBe('Go to year view?');
+      }));
 
     describe('a11y', () => {
       describe('calendar body', () => {
@@ -280,7 +285,7 @@ describe('MdCalendar', () => {
             dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
             fixture.detectChanges();
 
-            expect(testComponent.selected).toBeNull();
+            expect(testComponent.selected).toBeUndefined();
 
             dispatchKeyboardEvent(calendarBodyEl, 'keydown', ENTER);
             fixture.detectChanges();
@@ -433,7 +438,7 @@ describe('MdCalendar', () => {
 
             expect(calendarInstance._monthView).toBe(true);
             expect(calendarInstance._activeDate).toEqual(new Date(2017, FEB, 28));
-            expect(testComponent.selected).toBeNull();
+            expect(testComponent.selected).toBeUndefined();
           });
         });
       });
@@ -444,8 +449,6 @@ describe('MdCalendar', () => {
     let fixture: ComponentFixture<CalendarWithMinMax>;
     let testComponent: CalendarWithMinMax;
     let calendarElement: HTMLElement;
-    let prevButton: HTMLButtonElement;
-    let nextButton: HTMLButtonElement;
     let calendarInstance: MdCalendar<Date>;
 
     beforeEach(() => {
@@ -453,9 +456,6 @@ describe('MdCalendar', () => {
 
       let calendarDebugElement = fixture.debugElement.query(By.directive(MdCalendar));
       calendarElement = calendarDebugElement.nativeElement;
-      prevButton =
-          calendarElement.querySelector('.mat-calendar-previous-button') as HTMLButtonElement;
-      nextButton = calendarElement.querySelector('.mat-calendar-next-button') as HTMLButtonElement;
       calendarInstance = calendarDebugElement.componentInstance;
       testComponent = fixture.componentInstance;
     });
@@ -478,6 +478,9 @@ describe('MdCalendar', () => {
       testComponent.startAt = new Date(2016, FEB, 1);
       fixture.detectChanges();
 
+      let prevButton =
+          calendarElement.querySelector('.mat-calendar-previous-button') as HTMLButtonElement;
+
       expect(prevButton.disabled).toBe(false, 'previous button should not be disabled');
       expect(calendarInstance._activeDate).toEqual(new Date(2016, FEB, 1));
 
@@ -496,6 +499,9 @@ describe('MdCalendar', () => {
     it('should not go forward past max date', () => {
       testComponent.startAt = new Date(2017, DEC, 1);
       fixture.detectChanges();
+
+      let nextButton =
+          calendarElement.querySelector('.mat-calendar-next-button') as HTMLButtonElement;
 
       expect(nextButton.disabled).toBe(false, 'next button should not be disabled');
       expect(calendarInstance._activeDate).toEqual(new Date(2017, DEC, 1));
@@ -560,7 +566,7 @@ describe('MdCalendar', () => {
         dispatchKeyboardEvent(calendarBodyEl, 'keydown', ENTER);
         fixture.detectChanges();
 
-        expect(testComponent.selected).toBeNull();
+        expect(testComponent.selected).toBeUndefined();
       });
 
       it('should allow entering month view at disabled month', () => {
@@ -578,9 +584,40 @@ describe('MdCalendar', () => {
         fixture.detectChanges();
 
         expect(calendarInstance._monthView).toBe(true);
-        expect(testComponent.selected).toBeNull();
+        expect(testComponent.selected).toBeUndefined();
       });
     });
+  });
+});
+
+describe('MdCalendar in compatibility mode', () => {
+  beforeEach(async(() => {
+    TestBed.configureTestingModule({
+      imports: [
+        MdButtonModule,
+        MdNativeDateModule,
+        NoConflictStyleCompatibilityMode,
+      ],
+      declarations: [
+        MdCalendar,
+        MdCalendarBody,
+        MdMonthView,
+        MdYearView,
+
+        // Test components.
+        StandardCalendar,
+      ],
+      providers: [
+        MdDatepickerIntl,
+      ],
+    });
+
+    TestBed.compileComponents();
+  }));
+
+  it('should not throw on creation', () => {
+    let fixture = TestBed.createComponent(StandardCalendar);
+    expect(() => fixture.detectChanges()).not.toThrow();
   });
 });
 
@@ -589,7 +626,7 @@ describe('MdCalendar', () => {
   template: `<md-calendar [startAt]="startDate" [(selected)]="selected"></md-calendar>`
 })
 class StandardCalendar {
-  selected: Date = null;
+  selected: Date;
   startDate = new Date(2017, JAN, 31);
 }
 
@@ -613,7 +650,7 @@ class CalendarWithMinMax {
   `
 })
 class CalendarWithDateFilter {
-  selected: Date = null;
+  selected: Date;
   startDate = new Date(2017, JAN, 1);
 
   dateFilter (date: Date) {

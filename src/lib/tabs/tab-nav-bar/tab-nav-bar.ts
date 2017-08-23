@@ -1,25 +1,53 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {
-  Component,
-  Input,
-  ViewChild,
-  ElementRef,
-  ViewEncapsulation,
-  Directive,
-  NgZone,
-  Inject,
-  Optional,
-  OnDestroy,
   AfterContentInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  Directive,
+  ElementRef,
+  Inject,
+  Input,
+  NgZone,
+  OnDestroy,
+  Optional,
+  Renderer2,
+  ViewChild,
+  ViewEncapsulation,
+  ContentChildren,
+  QueryList,
+  forwardRef,
 } from '@angular/core';
-import {MdInkBar} from '../ink-bar';
-import {MdRipple} from '../../core/ripple/index';
-import {ViewportRuler} from '../../core/overlay/position/viewport-ruler';
-import {MD_RIPPLE_GLOBAL_OPTIONS, RippleGlobalOptions, Dir, Platform} from '../../core';
-import {Observable} from 'rxjs/Observable';
+import {ViewportRuler} from '@angular/cdk/scrolling';
+import {Directionality} from '@angular/cdk/bidi';
+import {Platform} from '@angular/cdk/platform';
+import {auditTime, takeUntil} from '@angular/cdk/rxjs';
+import {Subject} from 'rxjs/Subject';
 import {Subscription} from 'rxjs/Subscription';
-import 'rxjs/add/operator/auditTime';
-import 'rxjs/add/observable/of';
-import 'rxjs/add/observable/merge';
+import {of as observableOf} from 'rxjs/observable/of';
+import {merge} from 'rxjs/observable/merge';
+import {fromEvent} from 'rxjs/observable/fromEvent';
+import {CanDisableRipple, mixinDisableRipple} from '../../core/common-behaviors/disable-ripple';
+import {coerceBooleanProperty} from '@angular/cdk/coercion';
+import {CanDisable, mixinDisabled} from '../../core/common-behaviors/disabled';
+import {MD_RIPPLE_GLOBAL_OPTIONS, MdRipple, RippleGlobalOptions} from '../../core';
+import {CanColor, mixinColor, ThemePalette} from '../../core/common-behaviors/color';
+import {MdInkBar} from '../ink-bar';
+
+
+// Boilerplate for applying mixins to MdTabNav.
+/** @docs-private */
+export class MdTabNavBase {
+  constructor(public _renderer: Renderer2, public _elementRef: ElementRef) {}
+}
+export const _MdTabNavMixinBase = mixinDisableRipple(mixinColor(MdTabNavBase, 'primary'));
 
 /**
  * Navigation component matching the styles of the tab group header.
@@ -28,37 +56,84 @@ import 'rxjs/add/observable/merge';
 @Component({
   moduleId: module.id,
   selector: '[md-tab-nav-bar], [mat-tab-nav-bar]',
+  inputs: ['color', 'disableRipple'],
   templateUrl: 'tab-nav-bar.html',
   styleUrls: ['tab-nav-bar.css'],
   host: {'class': 'mat-tab-nav-bar'},
   encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdTabNavBar implements AfterContentInit, OnDestroy {
-  /** Combines listeners that will re-align the ink bar whenever they're invoked. */
-  private _realignInkBar: Subscription = null;
+export class MdTabNav extends _MdTabNavMixinBase implements AfterContentInit, CanColor,
+    CanDisableRipple, OnDestroy {
+
+  /** Subject that emits when the component has been destroyed. */
+  private _onDestroy = new Subject<void>();
 
   _activeLinkChanged: boolean;
   _activeLinkElement: ElementRef;
 
   @ViewChild(MdInkBar) _inkBar: MdInkBar;
 
-  constructor(@Optional() private _dir: Dir, private _ngZone: NgZone) { }
+  /** Query list of all tab links of the tab navigation. */
+  @ContentChildren(forwardRef(() => MdTabLink), {descendants: true})
+  _tabLinks: QueryList<MdTabLink>;
+
+  /** Subscription for window.resize event **/
+  private _resizeSubscription: Subscription;
+
+  /** Background color of the tab nav. */
+  @Input()
+  get backgroundColor(): ThemePalette { return this._backgroundColor; }
+  set backgroundColor(value: ThemePalette) {
+    let nativeElement = this._elementRef.nativeElement;
+
+    this._renderer.removeClass(nativeElement, `mat-background-${this.backgroundColor}`);
+
+    if (value) {
+      this._renderer.addClass(nativeElement, `mat-background-${value}`);
+    }
+
+    this._backgroundColor = value;
+  }
+  private _backgroundColor: ThemePalette;
+
+  /** Whether ripples should be disabled for all links or not. */
+  get disableRipple() { return this._disableRipple; }
+  set disableRipple(value: boolean) {
+    this._disableRipple = coerceBooleanProperty(value);
+    this._setLinkDisableRipple();
+  }
+  private _disableRipple: boolean = false;
+
+  constructor(renderer: Renderer2,
+              elementRef: ElementRef,
+              @Optional() private _dir: Directionality,
+              private _ngZone: NgZone,
+              private _changeDetectorRef: ChangeDetectorRef) {
+    super(renderer, elementRef);
+  }
 
   /** Notifies the component that the active link has been changed. */
   updateActiveLink(element: ElementRef) {
     this._activeLinkChanged = this._activeLinkElement != element;
     this._activeLinkElement = element;
+
+    if (this._activeLinkChanged) {
+      this._changeDetectorRef.markForCheck();
+    }
   }
 
   ngAfterContentInit(): void {
-    this._realignInkBar = this._ngZone.runOutsideAngular(() => {
-      let dirChange = this._dir ? this._dir.dirChange : Observable.of(null);
+    this._resizeSubscription = this._ngZone.runOutsideAngular(() => {
+      let dirChange = this._dir ? this._dir.change : observableOf(null);
       let resize = typeof window !== 'undefined' ?
-          Observable.fromEvent(window, 'resize').auditTime(10) :
-          Observable.of(null);
+          auditTime.call(fromEvent(window, 'resize'), 10) :
+          observableOf(null);
 
-      return Observable.merge(dirChange, resize).subscribe(() => this._alignInkBar());
+      return takeUntil.call(merge(dirChange, resize), this._onDestroy)
+          .subscribe(() => this._alignInkBar());
     });
+    this._setLinkDisableRipple();
   }
 
   /** Checks if the active link has been changed and, if so, will update the ink bar. */
@@ -70,29 +145,55 @@ export class MdTabNavBar implements AfterContentInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this._realignInkBar) {
-      this._realignInkBar.unsubscribe();
-      this._realignInkBar = null;
+    this._onDestroy.next();
+
+    if (this._resizeSubscription) {
+      this._resizeSubscription.unsubscribe();
     }
   }
 
   /** Aligns the ink bar to the active link. */
-  private _alignInkBar(): void {
+  _alignInkBar(): void {
     if (this._activeLinkElement) {
       this._inkBar.alignToElement(this._activeLinkElement.nativeElement);
     }
   }
+
+  /** Sets the `disableRipple` property on each link of the navigation bar. */
+  private _setLinkDisableRipple() {
+    if (this._tabLinks) {
+      this._tabLinks.forEach(link => link.disableRipple = this.disableRipple);
+    }
+  }
 }
+
+
+// Boilerplate for applying mixins to MdTabLink.
+export class MdTabLinkBase {}
+export const _MdTabLinkMixinBase = mixinDisabled(MdTabLinkBase);
 
 /**
  * Link inside of a `md-tab-nav-bar`.
  */
 @Directive({
-  selector: '[md-tab-link], [mat-tab-link]',
-  host: {'class': 'mat-tab-link'}
+  selector: '[md-tab-link], [mat-tab-link], [mdTabLink], [matTabLink]',
+  inputs: ['disabled'],
+  host: {
+    'class': 'mat-tab-link',
+    '[attr.aria-disabled]': 'disabled.toString()',
+    '[attr.tabindex]': 'tabIndex',
+    '[class.mat-tab-disabled]': 'disabled'
+  }
 })
-export class MdTabLink {
+export class MdTabLink extends _MdTabLinkMixinBase implements OnDestroy, CanDisable {
+  /** Whether the tab link is active or not. */
   private _isActive: boolean = false;
+
+  /** Whether the ripples for this tab should be disabled or not. */
+  private _disableRipple: boolean = false;
+
+  /** Reference to the instance of the ripple for the tab link. */
+  private _tabLinkRipple: MdRipple;
 
   /** Whether the link is active. */
   @Input()
@@ -104,24 +205,35 @@ export class MdTabLink {
     }
   }
 
-  constructor(private _mdTabNavBar: MdTabNavBar, private _elementRef: ElementRef) {}
-}
+  /** Whether ripples should be disabled or not. */
+  get disableRipple(): boolean { return this._disableRipple; }
+  set disableRipple(value: boolean) {
+    this._disableRipple = value;
+    this._tabLinkRipple.disabled = this.disableRipple;
+    this._tabLinkRipple._updateRippleRenderer();
+  }
 
-/**
- * Simple directive that extends the ripple and matches the selector of the MdTabLink. This
- * adds the ripple behavior to nav bar labels.
- */
-@Directive({
-  selector: '[md-tab-link], [mat-tab-link]',
-  host: {'class': 'mat-tab-link'},
-})
-export class MdTabLinkRipple extends MdRipple {
-  constructor(
-      elementRef: ElementRef,
-      ngZone: NgZone,
-      ruler: ViewportRuler,
-      platform: Platform,
-      @Optional() @Inject(MD_RIPPLE_GLOBAL_OPTIONS) globalOptions: RippleGlobalOptions) {
-    super(elementRef, ngZone, ruler, platform, globalOptions);
+  /** @docs-private */
+  get tabIndex(): number {
+    return this.disabled ? -1 : 0;
+  }
+
+  constructor(private _mdTabNavBar: MdTabNav,
+              private _elementRef: ElementRef,
+              ngZone: NgZone,
+              ruler: ViewportRuler,
+              platform: Platform,
+              @Optional() @Inject(MD_RIPPLE_GLOBAL_OPTIONS) globalOptions: RippleGlobalOptions) {
+    super();
+
+    // Manually create a ripple instance that uses the tab link element as trigger element.
+    // Notice that the lifecycle hooks for the ripple config won't be called anymore.
+    this._tabLinkRipple = new MdRipple(_elementRef, ngZone, ruler, platform, globalOptions);
+  }
+
+  ngOnDestroy() {
+    // Manually call the ngOnDestroy lifecycle hook of the ripple instance because it won't be
+    // called automatically since its instance is not created by Angular.
+    this._tabLinkRipple.ngOnDestroy();
   }
 }

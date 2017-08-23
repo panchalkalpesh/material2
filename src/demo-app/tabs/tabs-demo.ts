@@ -1,5 +1,4 @@
 import {Component, ViewEncapsulation} from '@angular/core';
-import {Router} from '@angular/router';
 import {Observable} from 'rxjs/Observable';
 
 @Component({
@@ -16,7 +15,8 @@ export class TabsDemo {
     {label: 'Rain', link: 'rainy-tab'},
     {label: 'Fog', link: 'foggy-tab'},
   ];
-  activeLinkIndex = 0;
+
+  tabNavBackground: any = undefined;
 
   // Standard tabs demo
   tabs = [
@@ -62,18 +62,12 @@ export class TabsDemo {
 
   asyncTabs: Observable<any>;
 
-  constructor(private router: Router) {
+  constructor() {
     this.asyncTabs = Observable.create((observer: any) => {
       setTimeout(() => {
         observer.next(this.tabs);
       }, 1000);
     });
-
-    // Initialize the index by checking if a tab link is contained in the url.
-    // This is not an ideal check and can be removed if routerLink exposes if it is active.
-    // https://github.com/angular/angular/pull/12525
-    this.activeLinkIndex =
-        this.tabLinks.indexOf(this.tabLinks.find(tab => router.url.indexOf(tab.link) != -1));
   }
 
   addTab(includeExtraContent: boolean): void {
@@ -90,6 +84,20 @@ export class TabsDemo {
 
   deleteTab(tab: any) {
     this.dynamicTabs.splice(this.dynamicTabs.indexOf(tab), 1);
+  }
+
+  swapTabLinks() {
+    const temp = this.tabLinks[0];
+    this.tabLinks[0] = this.tabLinks[1];
+    this.tabLinks[1] = temp;
+  }
+
+  addToLabel() {
+    this.tabLinks.forEach(link => link.label += 'extracontent');
+  }
+
+  toggleBackground() {
+    this.tabNavBackground = this.tabNavBackground ? undefined : 'primary';
   }
 }
 

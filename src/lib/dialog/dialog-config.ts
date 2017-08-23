@@ -1,4 +1,13 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {ViewContainerRef} from '@angular/core';
+import {Direction} from '@angular/cdk/bidi';
 
 /** Valid ARIA roles for a dialog element. */
 export type DialogRole = 'dialog' | 'alertdialog';
@@ -24,8 +33,14 @@ export class MdDialogConfig {
    */
   viewContainerRef?: ViewContainerRef;
 
+  /** ID for the dialog. If omitted, a unique one will be generated. */
+  id?: string;
+
   /** The ARIA role of the dialog element. */
   role?: DialogRole = 'dialog';
+
+  /** Custom class for the overlay pane. */
+  panelClass?: string | string[] = '';
 
   /** Whether the dialog has a backdrop. */
   hasBackdrop?: boolean = true;
@@ -47,6 +62,13 @@ export class MdDialogConfig {
 
   /** Data being injected into the child component. */
   data?: any = null;
+
+  /** Layout direction for the dialog's content. */
+  direction?: Direction = 'ltr';
+
+  /** ID of the element that describes the dialog.  */
+  ariaDescribedBy?: string | null = null;
+
 
   // TODO(jelbourn): add configuration for lifecycle hooks, ARIA labelling.
 }

@@ -1,4 +1,14 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+import {Inject, Injectable, Optional, LOCALE_ID} from '@angular/core';
 import {DateAdapter} from './date-adapter';
+import {extendObject} from '../util/object-extend';
 
 
 // TODO(mmalerba): Remove when we no longer support safari 9.
@@ -31,12 +41,30 @@ const DEFAULT_DAY_OF_WEEK_NAMES = {
 
 /** Creates an array and fills it with values. */
 function range<T>(length: number, valueFunction: (index: number) => T): T[] {
-  return Array.apply(null, Array(length)).map((v: undefined, i: number) => valueFunction(i));
+  const valuesArray = Array(length);
+  for (let i = 0; i < length; i++) {
+    valuesArray[i] = valueFunction(i);
+  }
+  return valuesArray;
 }
 
 
 /** Adapts the native JS Date for use with cdk-based components that work with dates. */
+@Injectable()
 export class NativeDateAdapter extends DateAdapter<Date> {
+  constructor(@Optional() @Inject(LOCALE_ID) localeId: any) {
+    super();
+    super.setLocale(localeId);
+  }
+
+  /**
+   * Whether to use `timeZone: 'utc'` with `Intl.DateTimeFormat` when formatting dates.
+   * Without this `Intl.DateTimeFormat` sometimes chooses the wrong timeZone, which can throw off
+   * the result. (e.g. in the en-US locale `new Date(1800, 7, 14).toLocaleDateString()`
+   * will produce `'8/13/1800'`.
+   */
+  useUtcForDisplay = true;
+
   getYear(date: Date): number {
     return date.getFullYear();
   }
@@ -104,16 +132,19 @@ export class NativeDateAdapter extends DateAdapter<Date> {
   createDate(year: number, month: number, date: number): Date {
     // Check for invalid month and date (except upper bound on date which we have to check after
     // creating the Date).
-    if (month < 0 || month > 11 || date < 1) {
-      return null;
+    if (month < 0 || month > 11) {
+      throw Error(`Invalid month index "${month}". Month index has to be between 0 and 11.`);
+    }
+
+    if (date < 1) {
+      throw Error(`Invalid date "${date}". Date has to be greater than 0.`);
     }
 
     let result = this._createDateWithOverflow(year, month, date);
 
-    // Check that the date wasn't above the upper bound for the month, causing the month to
-    // overflow.
+    // Check that the date wasn't above the upper bound for the month, causing the month to overflow
     if (result.getMonth() != month) {
-      return null;
+      throw Error(`Invalid date "${date}" for month with index "${month}".`);
     }
 
     return result;
@@ -123,15 +154,26 @@ export class NativeDateAdapter extends DateAdapter<Date> {
     return new Date();
   }
 
-  parse(value: any, parseFormat: Object): Date | null {
+  parse(value: any): Date | null {
     // We have no way using the native JS Date to set the parse format or locale, so we ignore these
     // parameters.
-    let timestamp = typeof value == 'number' ? value : Date.parse(value);
-    return isNaN(timestamp) ? null : new Date(timestamp);
+    if (typeof value == 'number') {
+      return new Date(value);
+    }
+    return value ? new Date(Date.parse(value)) : null;
   }
 
   format(date: Date, displayFormat: Object): string {
+    if (!this.isValid(date)) {
+      throw Error('NativeDateAdapter: Cannot format invalid date.');
+    }
     if (SUPPORTS_INTL_API) {
+      if (this.useUtcForDisplay) {
+        date = new Date(Date.UTC(
+            date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(),
+            date.getMinutes(), date.getSeconds(), date.getMilliseconds()));
+        displayFormat = extendObject({}, displayFormat, {timeZone: 'utc'});
+      }
       let dtf = new Intl.DateTimeFormat(this.locale, displayFormat);
       return this._stripDirectionalityCharacters(dtf.format(date));
     }
@@ -170,6 +212,14 @@ export class NativeDateAdapter extends DateAdapter<Date> {
     ].join('-');
   }
 
+  isDateInstance(obj: any) {
+    return obj instanceof Date;
+  }
+
+  isValid(date: Date) {
+    return !isNaN(date.getTime());
+  }
+
   /** Creates a date but allows the month and date to overflow. */
   private _createDateWithOverflow(year: number, month: number, date: number) {
     let result = new Date(year, month, date);
@@ -195,10 +245,10 @@ export class NativeDateAdapter extends DateAdapter<Date> {
    * Strip out unicode LTR and RTL characters. Edge and IE insert these into formatted dates while
    * other browsers do not. We remove them to make output consistent and because they interfere with
    * date parsing.
-   * @param s The string to strip direction characters from.
+   * @param str The string to strip direction characters from.
    * @returns The stripped string.
    */
-  private _stripDirectionalityCharacters(s: string) {
-    return s.replace(/[\u200e\u200f]/g, '');
+  private _stripDirectionalityCharacters(str: string) {
+    return str.replace(/[\u200e\u200f]/g, '');
   }
 }

@@ -1,6 +1,13 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {QueryList} from '@angular/core';
 import {MdGridTile} from './grid-tile';
-import {MdGridTileTooWideError} from './grid-list-errors';
 
 /**
  * Class for determining, from a list of tiles, the (row, col) position of each of those tiles
@@ -69,7 +76,8 @@ export class TileCoordinator {
   /** Finds the next available space large enough to fit the tile. */
   private _findMatchingGap(tileCols: number): number {
     if (tileCols > this.tracker.length) {
-      throw new MdGridTileTooWideError(tileCols, this.tracker.length);
+      throw Error(`md-grid-list: tile with colspan ${tileCols} is wider than ` +
+                      `grid with cols="${this.tracker.length}".`);
     }
 
     // Start index is inclusive, end index is exclusive.

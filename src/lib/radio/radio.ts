@@ -1,5 +1,15 @@
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {
   AfterContentInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ContentChildren,
   Directive,
@@ -25,9 +35,13 @@ import {
   FocusOriginMonitor,
   FocusOrigin,
 } from '../core';
-import {coerceBooleanProperty} from '../core/coercion/boolean-property';
+import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {mixinDisabled, CanDisable} from '../core/common-behaviors/disabled';
+import {CanColor, mixinColor} from '../core/common-behaviors/color';
+import {CanDisableRipple, mixinDisableRipple} from '../core/common-behaviors/disable-ripple';
 
+// Increasing integer for generating unique ids for radio components.
+let nextUniqueId = 0;
 
 /**
  * Provider Expression that allows md-radio-group to register as a ControlValueAccessor. This
@@ -40,18 +54,17 @@ export const MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR: any = {
   multi: true
 };
 
-let _uniqueIdCounter = 0;
-
 /** Change event object emitted by MdRadio and MdRadioGroup. */
 export class MdRadioChange {
   /** The MdRadioButton that emits the change event. */
-  source: MdRadioButton;
+  source: MdRadioButton | null;
   /** The value of the MdRadioButton. */
   value: any;
 }
 
 
 // Boilerplate for applying mixins to MdRadioGroup.
+/** @docs-private */
 export class MdRadioGroupBase { }
 export const _MdRadioGroupMixinBase = mixinDisabled(MdRadioGroupBase);
 
@@ -63,7 +76,7 @@ export const _MdRadioGroupMixinBase = mixinDisabled(MdRadioGroupBase);
   providers: [MD_RADIO_GROUP_CONTROL_VALUE_ACCESSOR],
   host: {
     'role': 'radiogroup',
-    '[class.mat-radio-group]': 'true',
+    'class': 'mat-radio-group',
   },
   inputs: ['disabled'],
 })
@@ -78,16 +91,25 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   private _value: any = null;
 
   /** The HTML name attribute applied to radio buttons in this group. */
-  private _name: string = `md-radio-group-${_uniqueIdCounter++}`;
+  private _name: string = `md-radio-group-${nextUniqueId++}`;
 
   /** The currently selected radio button. Should match value. */
-  private _selected: MdRadioButton = null;
+  private _selected: MdRadioButton | null = null;
 
   /** Whether the `value` has been set to its initial value. */
   private _isInitialized: boolean = false;
 
+  /** Whether the labels should appear after or before the radio-buttons. Defaults to 'after' */
+  private _labelPosition: 'before' | 'after' = 'after';
+
+  /** Whether the radio group is disabled. */
+  private _disabled: boolean = false;
+
+  /** Whether the radio group is required. */
+  private _required: boolean = false;
+
   /** The method to be called in order to update ngModel */
-  _controlValueAccessorChangeFn: (value: any) => void = (value) => {};
+  _controlValueAccessorChangeFn: (value: any) => void = () => {};
 
   /**
    * onTouch function registered via registerOnTouch (ControlValueAccessor).
@@ -103,8 +125,7 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   @Output() change: EventEmitter<MdRadioChange> = new EventEmitter<MdRadioChange>();
 
   /** Child radio buttons. */
-  @ContentChildren(forwardRef(() => MdRadioButton))
-  _radios: QueryList<MdRadioButton> = null;
+  @ContentChildren(forwardRef(() => MdRadioButton)) _radios: QueryList<MdRadioButton>;
 
   /** Name of the radio button group. All radio buttons inside this group will use this name. */
   @Input()
@@ -129,8 +150,17 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
     this.labelPosition = (v == 'start') ? 'after' : 'before';
   }
 
+
   /** Whether the labels should appear after or before the radio-buttons. Defaults to 'after' */
-  @Input() labelPosition: 'before' | 'after' = 'after';
+  @Input()
+  get labelPosition() {
+    return this._labelPosition;
+  }
+
+  set labelPosition(v) {
+    this._labelPosition = (v == 'before') ? 'before' : 'after';
+    this._markRadiosForCheck();
+  }
 
   /** Value of the radio button. */
   @Input()
@@ -146,7 +176,7 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   }
 
   _checkSelectedRadioButton() {
-    if (this.selected && !this._selected.checked) {
+    if (this._selected && !this._selected.checked) {
       this._selected.checked = true;
     }
   }
@@ -154,10 +184,30 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   /** Whether the radio button is selected. */
   @Input()
   get selected() { return this._selected; }
-  set selected(selected: MdRadioButton) {
+  set selected(selected: MdRadioButton | null) {
     this._selected = selected;
     this.value = selected ? selected.value : null;
     this._checkSelectedRadioButton();
+  }
+
+  /** Whether the radio group is disabled */
+  @Input()
+  get disabled(): boolean { return this._disabled; }
+  set disabled(value) {
+    this._disabled = coerceBooleanProperty(value);
+    this._markRadiosForCheck();
+  }
+
+  /** Whether the radio group is required */
+  @Input()
+  get required(): boolean { return this._required; }
+  set required(value: boolean) {
+    this._required = coerceBooleanProperty(value);
+    this._markRadiosForCheck();
+  }
+
+  constructor(private _changeDetector: ChangeDetectorRef) {
+    super();
   }
 
   /**
@@ -192,7 +242,7 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   /** Updates the `selected` radio button from the internal _value state. */
   private _updateSelectedRadioFromValue(): void {
     // If the value already matches the selected radio, do nothing.
-    let isAlreadySelected = this._selected != null && this._selected.value == this._value;
+    const isAlreadySelected = this._selected != null && this._selected.value == this._value;
 
     if (this._radios != null && !isAlreadySelected) {
       this._selected = null;
@@ -208,10 +258,16 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   /** Dispatch change event with current selection and group value. */
   _emitChangeEvent(): void {
     if (this._isInitialized) {
-      let event = new MdRadioChange();
+      const event = new MdRadioChange();
       event.source = this._selected;
       event.value = this._value;
       this.change.emit(event);
+    }
+  }
+
+  _markRadiosForCheck() {
+    if (this._radios) {
+      this._radios.forEach(radio => radio._markForCheck());
     }
   }
 
@@ -221,6 +277,7 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
    */
   writeValue(value: any) {
     this.value = value;
+    this._changeDetector.markForCheck();
   }
 
   /**
@@ -247,8 +304,18 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
    */
   setDisabledState(isDisabled: boolean) {
     this.disabled = isDisabled;
+    this._changeDetector.markForCheck();
   }
 }
+
+// Boilerplate for applying mixins to MdRadioButton.
+/** @docs-private */
+export class MdRadioButtonBase {
+  constructor(public _renderer: Renderer2, public _elementRef: ElementRef) {}
+}
+// As per Material design specifications the selection control radio should use the accent color
+// palette by default. https://material.io/guidelines/components/selection-controls.html
+export const _MdRadioButtonMixinBase = mixinColor(mixinDisableRipple(MdRadioButtonBase), 'accent');
 
 /**
  * A radio-button. May be inside of
@@ -258,18 +325,27 @@ export class MdRadioGroup extends _MdRadioGroupMixinBase
   selector: 'md-radio-button, mat-radio-button',
   templateUrl: 'radio.html',
   styleUrls: ['radio.css'],
+  inputs: ['color', 'disableRipple'],
   encapsulation: ViewEncapsulation.None,
   host: {
-    '[class.mat-radio-button]': 'true',
+    'class': 'mat-radio-button',
     '[class.mat-radio-checked]': 'checked',
     '[class.mat-radio-disabled]': 'disabled',
     '[attr.id]': 'id',
-  }
+    // Note: under normal conditions focus shouldn't land on this element, however it may be
+    // programmatically set, for example inside of a focus trap, in this case we want to forward
+    // the focus to the native element.
+    '(focus)': '_inputElement.nativeElement.focus()',
+  },
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
+export class MdRadioButton extends _MdRadioButtonMixinBase
+    implements OnInit, AfterViewInit, OnDestroy, CanColor, CanDisableRipple {
+
+  private _uniqueId: string = `md-radio-${++nextUniqueId}`;
 
   /** The unique ID for the radio button. */
-  @Input() id: string = `md-radio-${_uniqueIdCounter++}`;
+  @Input() id: string = this._uniqueId;
 
   /** Analog to HTML 'name' attribute used to group radios for unique selection. */
   @Input() name: string;
@@ -279,11 +355,6 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
 
   /** The 'aria-labelledby' attribute takes precedence as the element's text alternative. */
   @Input('aria-labelledby') ariaLabelledby: string;
-
-  /** Whether the ripple effect for this radio button is disabled. */
-  @Input()
-  get disableRipple(): boolean { return this._disableRipple; }
-  set disableRipple(value) { this._disableRipple = coerceBooleanProperty(value); }
 
   /** Whether this radio button is checked. */
   @Input()
@@ -307,6 +378,7 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
         // Notify all radio buttons with the same name to un-check.
         this._radioDispatcher.notify(this.id, this.name);
       }
+      this._changeDetector.markForCheck();
     }
   }
 
@@ -328,7 +400,6 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
           this.radioGroup.selected = this;
         }
       }
-
     }
   }
 
@@ -364,9 +435,17 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
   get disabled(): boolean {
     return this._disabled || (this.radioGroup != null && this.radioGroup.disabled);
   }
-
   set disabled(value: boolean) {
     this._disabled = coerceBooleanProperty(value);
+  }
+
+  /** Whether the radio button is required. */
+  @Input()
+  get required(): boolean {
+    return this._required || (this.radioGroup && this.radioGroup.required);
+  }
+  set required(value: boolean) {
+    this._required = coerceBooleanProperty(value);
   }
 
   /**
@@ -380,9 +459,7 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
   radioGroup: MdRadioGroup;
 
   /** ID of the native input element inside `<md-radio-button>` */
-  get inputId(): string {
-    return `${this.id}-input`;
-  }
+  get inputId(): string { return `${this.id || this._uniqueId}-input`; }
 
   /** Whether this radio is checked. */
   private _checked: boolean = false;
@@ -390,41 +467,58 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
   /** Whether this radio is disabled. */
   private _disabled: boolean;
 
+  /** Whether this radio is required. */
+  private _required: boolean;
+
   /** Value assigned to this radio.*/
   private _value: any = null;
-
-  /** Whether the ripple effect on click should be disabled. */
-  private _disableRipple: boolean;
 
   /** The child ripple instance. */
   @ViewChild(MdRipple) _ripple: MdRipple;
 
   /** Reference to the current focus ripple. */
-  private _focusRipple: RippleRef;
+  private _focusRipple: RippleRef | null;
+
+  /** Unregister function for _radioDispatcher **/
+  private _removeUniqueSelectionListener: () => void = () => {};
 
   /** The native `<input type=radio>` element */
   @ViewChild('input') _inputElement: ElementRef;
 
   constructor(@Optional() radioGroup: MdRadioGroup,
-              private _elementRef: ElementRef,
-              private _renderer: Renderer2,
+              elementRef: ElementRef,
+              renderer: Renderer2,
+              private _changeDetector: ChangeDetectorRef,
               private _focusOriginMonitor: FocusOriginMonitor,
               private _radioDispatcher: UniqueSelectionDispatcher) {
+    super(renderer, elementRef);
+
     // Assertions. Ideally these should be stripped out by the compiler.
     // TODO(jelbourn): Assert that there's no name binding AND a parent radio group.
-
     this.radioGroup = radioGroup;
 
-    _radioDispatcher.listen((id: string, name: string) => {
-      if (id != this.id && name == this.name) {
-        this.checked = false;
-      }
-    });
+    this._removeUniqueSelectionListener =
+      _radioDispatcher.listen((id: string, name: string) => {
+        if (id != this.id && name == this.name) {
+          this.checked = false;
+        }
+      });
   }
 
   /** Focuses the radio button. */
   focus(): void {
-    this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, this._renderer, 'keyboard');
+    this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
+  }
+
+  /**
+   * Marks the radio button as needing checking for change detection.
+   * This method is exposed because the parent radio group will directly
+   * update bound properties of the radio button.
+   */
+  _markForCheck() {
+    // When group value changes, the button will not be notified. Use `markForCheck` to explicit
+    // update radio button's status
+    this._changeDetector.markForCheck();
   }
 
   ngOnInit() {
@@ -444,11 +538,12 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this._focusOriginMonitor.stopMonitoring(this._inputElement.nativeElement);
+    this._removeUniqueSelectionListener();
   }
 
   /** Dispatch change event with current value. */
   private _emitChangeEvent(): void {
-    let event = new MdRadioChange();
+    const event = new MdRadioChange();
     event.source = this;
     event.value = this._value;
     this.change.emit(event);
@@ -479,7 +574,7 @@ export class MdRadioButton implements OnInit, AfterViewInit, OnDestroy {
     // emit its event object to the `change` output.
     event.stopPropagation();
 
-    let groupValueChanged = this.radioGroup && this.value != this.radioGroup.value;
+    const groupValueChanged = this.radioGroup && this.value != this.radioGroup.value;
     this.checked = true;
     this._emitChangeEvent();
 

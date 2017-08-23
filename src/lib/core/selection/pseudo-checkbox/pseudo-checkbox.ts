@@ -1,10 +1,12 @@
-import {
-  Component,
-  ViewEncapsulation,
-  Input,
-  ElementRef,
-  Renderer2,
-} from '@angular/core';
+/**
+ * @license
+ * Copyright Google Inc. All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
+import {Component, ViewEncapsulation, Input, ChangeDetectionStrategy} from '@angular/core';
 
 export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
 
@@ -12,6 +14,8 @@ export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
  * Component that shows a simplified checkbox without including any kind of "real" checkbox.
  * Meant to be used when the checkbox is purely decorative and a large number of them will be
  * included, such as for the options in a multi-select. Uses no SVGs or complex animations.
+ * Note that theming is meant to be handled by the parent element, e.g.
+ * `mat-primary .mat-pseudo-checkbox`.
  *
  * Note that this component will be completely invisible to screen-reader users. This is *not*
  * interchangeable with <md-checkbox> and should *not* be used if the user would directly interact
@@ -22,11 +26,12 @@ export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
 @Component({
   moduleId: module.id,
   encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'md-pseudo-checkbox, mat-pseudo-checkbox',
   styleUrls: ['pseudo-checkbox.css'],
   template: '',
   host: {
-    '[class.mat-pseudo-checkbox]': 'true',
+    'class': 'mat-pseudo-checkbox',
     '[class.mat-pseudo-checkbox-indeterminate]': 'state === "indeterminate"',
     '[class.mat-pseudo-checkbox-checked]': 'state === "checked"',
     '[class.mat-pseudo-checkbox-disabled]': 'disabled',
@@ -38,23 +43,4 @@ export class MdPseudoCheckbox {
 
   /** Whether the checkbox is disabled. */
   @Input() disabled: boolean = false;
-
-  /** Color of the checkbox. */
-  @Input()
-  get color(): string { return this._color; }
-  set color(value: string) {
-    if (value) {
-      let nativeElement = this._elementRef.nativeElement;
-
-      this._renderer.removeClass(nativeElement, `mat-${this.color}`);
-      this._renderer.addClass(nativeElement, `mat-${value}`);
-      this._color = value;
-    }
-  }
-
-  private _color: string;
-
-  constructor(private _elementRef: ElementRef, private _renderer: Renderer2) {
-    this.color = 'accent';
-  }
 }

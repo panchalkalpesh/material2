@@ -1,4 +1,5 @@
 @import '../core/style/list-common';
+@import '../core/style/layout-common';
 
 
 // height of tile header or footer if it has one line
@@ -7,10 +8,6 @@ $mat-grid-list-one-line-height: 48px;
 $mat-grid-list-two-line-height: 68px;
 // side padding for text in tile headers and footers
 $mat-grid-list-text-padding: 16px;
-
-// font styles for text in tile headers and footers
-$mat-grid-list-font-size: 16px;
-$mat-grid-list-secondary-font: 12px;
 
 .mat-grid-list {
   display: block;
@@ -23,17 +20,12 @@ $mat-grid-list-secondary-font: 12px;
   overflow: hidden;
 
   .mat-figure {
+    @include mat-fill;
     display: flex;
-    position: absolute;
 
     align-items: center;
     justify-content: center;
     height: 100%;
-
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
 
     padding: 0;
     margin: 0;
@@ -42,7 +34,6 @@ $mat-grid-list-secondary-font: 12px;
   // Headers & footers
   .mat-grid-tile-header,
   .mat-grid-tile-footer {
-    @include mat-line-base($mat-grid-list-secondary-font);
     @include mat-normalize-text();
 
     display: flex;
@@ -52,7 +43,6 @@ $mat-grid-list-secondary-font: 12px;
     background: rgba(0, 0, 0, 0.38);
     overflow: hidden;
     padding: 0 $mat-grid-list-text-padding;
-    font-size: $mat-grid-list-font-size;
 
     // Positioning
     position: absolute;
