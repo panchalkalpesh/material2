@@ -1,12 +1,13 @@
 import {async, TestBed, ComponentFixture} from '@angular/core/testing';
 import {MdChipsModule} from './index';
 import {Component, DebugElement} from '@angular/core';
+import {PlatformModule} from '../core/platform/index';
 import {MdChipInput, MdChipInputEvent} from './chip-input';
 import {By} from '@angular/platform-browser';
-import {Directionality} from '../core';
+import {Directionality} from '@angular/material/core';
 import {createKeyboardEvent} from '@angular/cdk/testing';
 
-import {ENTER} from '../core/keyboard/keycodes';
+import {ENTER} from '@angular/material/core';
 
 const COMMA = 188;
 
@@ -21,7 +22,7 @@ describe('MdChipInput', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdChipsModule],
+      imports: [MdChipsModule, PlatformModule],
       declarations: [TestChipInput],
       providers: [{
         provide: Directionality, useFactory: () => {

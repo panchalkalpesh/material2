@@ -34,17 +34,18 @@ import {FoggyTabContent, RainyTabContent, SunnyTabContent, TabsDemo} from '../ta
 import {PlatformDemo} from '../platform/platform-demo';
 import {AutocompleteDemo} from '../autocomplete/autocomplete-demo';
 import {InputDemo} from '../input/input-demo';
-import {StyleDemo} from '../style/style-demo';
+import {FocusOriginDemo} from '../focus-origin/focus-origin-demo';
 import {TableDemo} from '../table/table-demo';
 import {PeopleDatabase} from '../table/people-database';
 import {DatepickerDemo} from '../datepicker/datepicker-demo';
 import {TypographyDemo} from '../typography/typography-demo';
 import {ExpansionDemo} from '../expansion/expansion-demo';
+import {StepperDemo} from '../stepper/stepper-demo';
 import {DemoMaterialModule} from '../demo-material-module';
 import {
   FullscreenOverlayContainer,
   OverlayContainer,
-} from '@angular/material';
+} from '@angular/cdk/overlay';
 import {TableHeaderDemo} from '../table/table-header-demo';
 
 @NgModule({
@@ -92,7 +93,8 @@ import {TableHeaderDemo} from '../table/table-header-demo';
     SliderDemo,
     SlideToggleDemo,
     SpagettiPanel,
-    StyleDemo,
+    StepperDemo,
+    FocusOriginDemo,
     TableHeaderDemo,
     ToolbarDemo,
     TooltipDemo,

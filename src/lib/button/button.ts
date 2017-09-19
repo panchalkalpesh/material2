@@ -12,18 +12,23 @@ import {
   Directive,
   ElementRef,
   forwardRef,
+  Inject,
   OnDestroy,
   Optional,
   Renderer2,
   Self,
   ViewEncapsulation,
-  Inject,
 } from '@angular/core';
 import {Platform} from '@angular/cdk/platform';
-import {FocusOriginMonitor} from '../core';
-import {mixinDisabled, CanDisable} from '../core/common-behaviors/disabled';
-import {CanColor, mixinColor} from '../core/common-behaviors/color';
-import {CanDisableRipple, mixinDisableRipple} from '../core/common-behaviors/disable-ripple';
+import {
+  CanColor,
+  CanDisable,
+  CanDisableRipple,
+  mixinColor,
+  mixinDisabled,
+  mixinDisableRipple
+} from '@angular/material/core';
+import {FocusMonitor} from '@angular/cdk/a11y';
 
 
 // TODO(kara): Convert attribute selectors to classes when attr maps become available
@@ -137,13 +142,13 @@ export class MdButton extends _MdButtonMixinBase
   constructor(renderer: Renderer2,
               elementRef: ElementRef,
               private _platform: Platform,
-              private _focusOriginMonitor: FocusOriginMonitor) {
+              private _focusMonitor: FocusMonitor) {
     super(renderer, elementRef);
-    this._focusOriginMonitor.monitor(this._elementRef.nativeElement, this._renderer, true);
+    this._focusMonitor.monitor(this._elementRef.nativeElement, this._renderer, true);
   }
 
   ngOnDestroy() {
-    this._focusOriginMonitor.stopMonitoring(this._elementRef.nativeElement);
+    this._focusMonitor.stopMonitoring(this._elementRef.nativeElement);
   }
 
   /** Focuses the button. */
@@ -201,10 +206,10 @@ export class MdButton extends _MdButtonMixinBase
 export class MdAnchor extends MdButton {
   constructor(
       platform: Platform,
-      focusOriginMonitor: FocusOriginMonitor,
+      focusMonitor: FocusMonitor,
       elementRef: ElementRef,
       renderer: Renderer2) {
-    super(renderer, elementRef, platform, focusOriginMonitor);
+    super(renderer, elementRef, platform, focusMonitor);
   }
 
   _haltDisabledEvents(event: Event) {

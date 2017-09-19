@@ -15,12 +15,23 @@ import {
   ViewEncapsulation
 } from '@angular/core';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
+import {
+  trigger,
+  state,
+  style,
+  animate,
+  transition
+} from '@angular/animations';
 import {CdkColumnDef} from '@angular/cdk/table';
 import {Subscription} from 'rxjs/Subscription';
 import {merge} from 'rxjs/observable/merge';
 import {MdSort, MdSortable} from './sort';
 import {MdSortHeaderIntl} from './sort-header-intl';
 import {getMdSortHeaderNotContainedWithinMdSortError} from './sort-errors';
+import {AnimationCurves, AnimationDurations} from '@angular/material/core';
+
+const SORT_ANIMATION_TRANSITION =
+    AnimationDurations.ENTERING + ' ' + AnimationCurves.STANDARD_CURVE;
 
 /**
  * Applies sorting behavior (click to change sort) and styles to an element, including an
@@ -42,6 +53,24 @@ import {getMdSortHeaderNotContainedWithinMdSortError} from './sort-errors';
   },
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  animations: [
+    trigger('indicator', [
+      state('asc', style({transform: 'translateY(0px)'})),
+      // 10px is the height of the sort indicator, minus the width of the pointers
+      state('desc', style({transform: 'translateY(10px)'})),
+      transition('asc <=> desc', animate(SORT_ANIMATION_TRANSITION))
+    ]),
+    trigger('leftPointer', [
+      state('asc', style({transform: 'rotate(-45deg)'})),
+      state('desc', style({transform: 'rotate(45deg)'})),
+      transition('asc <=> desc', animate(SORT_ANIMATION_TRANSITION))
+    ]),
+    trigger('rightPointer', [
+      state('asc', style({transform: 'rotate(45deg)'})),
+      state('desc', style({transform: 'rotate(-45deg)'})),
+      transition('asc <=> desc', animate(SORT_ANIMATION_TRANSITION))
+    ])
+  ]
 })
 export class MdSortHeader implements MdSortable {
   private _rerenderSubscription: Subscription;
@@ -76,7 +105,7 @@ export class MdSortHeader implements MdSortable {
       throw getMdSortHeaderNotContainedWithinMdSortError();
     }
 
-    this._rerenderSubscription = merge(_sort.mdSortChange, _intl.changes).subscribe(() => {
+    this._rerenderSubscription = merge(_sort.sortChange, _intl.changes).subscribe(() => {
       changeDetectorRef.markForCheck();
     });
   }

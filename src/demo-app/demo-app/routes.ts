@@ -31,11 +31,12 @@ import {TABS_DEMO_ROUTES} from '../tabs/routes';
 import {PlatformDemo} from '../platform/platform-demo';
 import {AutocompleteDemo} from '../autocomplete/autocomplete-demo';
 import {InputDemo} from '../input/input-demo';
-import {StyleDemo} from '../style/style-demo';
+import {FocusOriginDemo} from '../focus-origin/focus-origin-demo';
 import {DatepickerDemo} from '../datepicker/datepicker-demo';
 import {TableDemo} from '../table/table-demo';
 import {TypographyDemo} from '../typography/typography-demo';
 import {ExpansionDemo} from '../expansion/expansion-demo';
+import {StepperDemo} from '../stepper/stepper-demo';
 import {DemoApp} from './demo-app';
 import {AccessibilityDemo} from '../a11y/a11y';
 import {ACCESSIBILITY_DEMO_ROUTES} from '../a11y/routes';
@@ -75,9 +76,10 @@ export const DEMO_APP_ROUTES: Routes = [
     {path: 'tooltip', component: TooltipDemo},
     {path: 'snack-bar', component: SnackBarDemo},
     {path: 'platform', component: PlatformDemo},
-    {path: 'style', component: StyleDemo},
+    {path: 'focus-origin', component: FocusOriginDemo},
     {path: 'typography', component: TypographyDemo},
     {path: 'expansion', component: ExpansionDemo},
+    {path: 'stepper', component: StepperDemo}
   ]}
 ];
 

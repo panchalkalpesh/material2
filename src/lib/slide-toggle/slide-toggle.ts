@@ -8,6 +8,7 @@
 
 import {
   AfterContentInit,
+  Attribute,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
@@ -25,16 +26,16 @@ import {Platform} from '@angular/cdk/platform';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {
   applyCssTransform,
-  FocusOrigin,
-  FocusOriginMonitor,
   HammerInput,
   MdRipple,
   RippleRef,
-} from '../core';
+} from '@angular/material/core';
 import {ControlValueAccessor, NG_VALUE_ACCESSOR} from '@angular/forms';
-import {mixinDisabled, CanDisable} from '../core/common-behaviors/disabled';
-import {CanColor, mixinColor} from '../core/common-behaviors/color';
-import {CanDisableRipple, mixinDisableRipple} from '../core/common-behaviors/disable-ripple';
+import {mixinDisabled, CanDisable} from '@angular/material/core';
+import {CanColor, mixinColor} from '@angular/material/core';
+import {CanDisableRipple, mixinDisableRipple} from '@angular/material/core';
+import {HasTabIndex, mixinTabIndex} from '@angular/material/core';
+import {FocusMonitor, FocusOrigin} from '@angular/cdk/a11y';
 
 // Increasing integer for generating unique ids for slide-toggle components.
 let nextUniqueId = 0;
@@ -57,7 +58,7 @@ export class MdSlideToggleBase {
   constructor(public _renderer: Renderer2, public _elementRef: ElementRef) {}
 }
 export const _MdSlideToggleMixinBase =
-  mixinColor(mixinDisableRipple(mixinDisabled(MdSlideToggleBase)), 'accent');
+  mixinTabIndex(mixinColor(mixinDisableRipple(mixinDisabled(MdSlideToggleBase)), 'accent'));
 
 /** Represents a slidable "switch" toggle that can be moved between on and off. */
 @Component({
@@ -73,12 +74,12 @@ export const _MdSlideToggleMixinBase =
   templateUrl: 'slide-toggle.html',
   styleUrls: ['slide-toggle.css'],
   providers: [MD_SLIDE_TOGGLE_VALUE_ACCESSOR],
-  inputs: ['disabled', 'disableRipple', 'color'],
+  inputs: ['disabled', 'disableRipple', 'color', 'tabIndex'],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MdSlideToggle extends _MdSlideToggleMixinBase implements OnDestroy, AfterContentInit,
-    ControlValueAccessor, CanDisable, CanColor, CanDisableRipple {
+    ControlValueAccessor, CanDisable, CanColor, HasTabIndex, CanDisableRipple {
 
   private onChange = (_: any) => {};
   private onTouched = () => {};
@@ -96,9 +97,6 @@ export class MdSlideToggle extends _MdSlideToggleMixinBase implements OnDestroy,
 
   /** A unique id for the slide-toggle input. If none is supplied, it will be auto-generated. */
   @Input() id: string = this._uniqueId;
-
-  /** Used to specify the tabIndex value for the underlying input element. */
-  @Input() tabIndex: number = 0;
 
   /** Whether the label should appear after or before the slide-toggle. Defaults to 'after' */
   @Input() labelPosition: 'before' | 'after' = 'after';
@@ -138,21 +136,24 @@ export class MdSlideToggle extends _MdSlideToggleMixinBase implements OnDestroy,
   constructor(elementRef: ElementRef,
               renderer: Renderer2,
               private _platform: Platform,
-              private _focusOriginMonitor: FocusOriginMonitor,
-              private _changeDetectorRef: ChangeDetectorRef) {
+              private _focusMonitor: FocusMonitor,
+              private _changeDetectorRef: ChangeDetectorRef,
+              @Attribute('tabindex') tabIndex: string) {
     super(renderer, elementRef);
+
+    this.tabIndex = parseInt(tabIndex) || 0;
   }
 
   ngAfterContentInit() {
     this._slideRenderer = new SlideToggleRenderer(this._elementRef, this._platform);
 
-    this._focusOriginMonitor
+    this._focusMonitor
       .monitor(this._inputElement.nativeElement, this._renderer, false)
       .subscribe(focusOrigin => this._onInputFocusChange(focusOrigin));
   }
 
   ngOnDestroy() {
-    this._focusOriginMonitor.stopMonitoring(this._inputElement.nativeElement);
+    this._focusMonitor.stopMonitoring(this._inputElement.nativeElement);
   }
 
   /**
@@ -214,7 +215,7 @@ export class MdSlideToggle extends _MdSlideToggleMixinBase implements OnDestroy,
 
   /** Focuses the slide-toggle. */
   focus() {
-    this._focusOriginMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
+    this._focusMonitor.focusVia(this._inputElement.nativeElement, 'keyboard');
   }
 
   /** Toggles the checked state of the slide-toggle. */
@@ -276,6 +277,13 @@ export class MdSlideToggle extends _MdSlideToggleMixinBase implements OnDestroy,
     }
   }
 
+  /** Method being called whenever the label text changes. */
+  _onLabelTextChange() {
+    // This method is getting called whenever the label of the slide-toggle changes.
+    // Since the slide-toggle uses the OnPush strategy we need to notify it about the change
+    // that has been recognized by the cdkObserveContent directive.
+    this._changeDetectorRef.markForCheck();
+  }
 }
 
 /**
@@ -301,12 +309,12 @@ class SlideToggleRenderer {
   /** Whether the thumb is currently being dragged. */
   dragging: boolean = false;
 
-  constructor(private _elementRef: ElementRef, platform: Platform) {
+  constructor(elementRef: ElementRef, platform: Platform) {
     // We only need to interact with these elements when we're on the browser, so only grab
     // the reference in that case.
     if (platform.isBrowser) {
-      this._thumbEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-thumb-container');
-      this._thumbBarEl = _elementRef.nativeElement.querySelector('.mat-slide-toggle-bar');
+      this._thumbEl = elementRef.nativeElement.querySelector('.mat-slide-toggle-thumb-container');
+      this._thumbBarEl = elementRef.nativeElement.querySelector('.mat-slide-toggle-bar');
     }
   }
 
