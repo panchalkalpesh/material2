@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {MdDialog} from '@angular/material';
+import {MatDialog} from '@angular/material';
 
 /**
  * @title Dialog elements
@@ -7,9 +7,10 @@ import {MdDialog} from '@angular/material';
 @Component({
   selector: 'dialog-elements-example',
   templateUrl: 'dialog-elements-example.html',
+  styleUrls: ['dialog-elements-example.css'],
 })
 export class DialogElementsExample {
-  constructor(public dialog: MdDialog) { }
+  constructor(public dialog: MatDialog) {}
 
   openDialog() {
     this.dialog.open(DialogElementsExampleDialog);
@@ -21,4 +22,4 @@ export class DialogElementsExample {
   selector: 'dialog-elements-example-dialog',
   templateUrl: 'dialog-elements-example-dialog.html',
 })
-export class DialogElementsExampleDialog { }
+export class DialogElementsExampleDialog {}

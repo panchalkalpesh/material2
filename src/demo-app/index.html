@@ -11,14 +11,20 @@
   <link href="theme.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500" rel="stylesheet">
 
-  <!-- FontAwesome for md-icon demo. -->
+  <script>
+    if (window.customElements) {
+      window.customElements.forcePolyfill = true;
+    }
+  </script>
+  <script src="node_modules/@webcomponents/custom-elements/custom-elements.min.js"></script>
+
+  <!-- FontAwesome for mat-icon demo. -->
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
 </head>
 <body>
   <entry-app>Loading...</entry-app>
 
   <script src="node_modules/core-js/client/core.js"></script>
-  <script src="node_modules/web-animations-js/web-animations.min.js"></script>
   <script src="node_modules/systemjs/dist/system.src.js"></script>
   <script src="node_modules/zone.js/dist/zone.js"></script>
   <script src="node_modules/hammerjs/hammer.min.js"></script>

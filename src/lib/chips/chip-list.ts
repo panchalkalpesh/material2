@@ -1,20 +1,23 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 import {FocusKeyManager} from '@angular/cdk/a11y';
+import {Directionality} from '@angular/cdk/bidi';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {SelectionModel} from '@angular/cdk/collections';
-import {startWith} from '@angular/cdk/rxjs';
+import {BACKSPACE} from '@angular/cdk/keycodes';
 import {
   AfterContentInit,
-  ChangeDetectorRef,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ContentChildren,
+  DoCheck,
   ElementRef,
   EventEmitter,
   Input,
@@ -23,35 +26,40 @@ import {
   Optional,
   Output,
   QueryList,
-  Renderer2,
   Self,
   ViewEncapsulation,
 } from '@angular/core';
 import {ControlValueAccessor, FormGroupDirective, NgControl, NgForm} from '@angular/forms';
-import {
-  BACKSPACE,
-  DELETE,
-  Directionality,
-  LEFT_ARROW,
-  RIGHT_ARROW,
-  UP_ARROW
-} from '@angular/material/core';
-import {MdFormFieldControl} from '@angular/material/form-field';
+import {CanUpdateErrorState, ErrorStateMatcher, mixinErrorState} from '@angular/material/core';
+import {MatFormFieldControl} from '@angular/material/form-field';
+import {merge, Observable, Subscription} from 'rxjs';
+import {startWith} from 'rxjs/operators';
+import {MatChip, MatChipEvent, MatChipSelectionChange} from './chip';
+import {MatChipInput} from './chip-input';
 
-import {Observable} from 'rxjs/Observable';
-import {merge} from 'rxjs/observable/merge';
-import {Subject} from 'rxjs/Subject';
-import {Subscription} from 'rxjs/Subscription';
 
-import {MdChip, MdChipEvent, MdChipSelectionChange} from './chip';
-import {MdChipInput} from './chip-input';
+// Boilerplate for applying mixins to MatChipList.
+/** @docs-private */
+export class MatChipListBase {
+  constructor(public _defaultErrorStateMatcher: ErrorStateMatcher,
+              public _parentForm: NgForm,
+              public _parentFormGroup: FormGroupDirective,
+              /** @docs-private */
+              public ngControl: NgControl) {}
+}
+export const _MatChipListMixinBase = mixinErrorState(MatChipListBase);
+
 
 // Increasing integer for generating unique ids for chip-list components.
 let nextUniqueId = 0;
 
 /** Change event object that is emitted when the chip list value has changed. */
-export class MdChipListChange {
-  constructor(public source: MdChipList, public value: any) { }
+export class MatChipListChange {
+  constructor(
+    /** Chip list that emitted the event. */
+    public source: MatChipList,
+    /** Value of the chip list when the event was emitted. */
+    public value: any) { }
 }
 
 
@@ -60,9 +68,9 @@ export class MdChipListChange {
  */
 @Component({
   moduleId: module.id,
-  selector: 'md-chip-list, mat-chip-list',
+  selector: 'mat-chip-list',
   template: `<div class="mat-chip-list-wrapper"><ng-content></ng-content></div>`,
-  exportAs: 'mdChipList, matChipList',
+  exportAs: 'matChipList',
   host: {
     '[attr.tabindex]': '_tabIndex',
     '[attr.aria-describedby]': '_ariaDescribedby || null',
@@ -70,35 +78,35 @@ export class MdChipListChange {
     '[attr.aria-disabled]': 'disabled.toString()',
     '[attr.aria-invalid]': 'errorState',
     '[attr.aria-multiselectable]': 'multiple',
+    '[attr.role]': 'role',
     '[class.mat-chip-list-disabled]': 'disabled',
     '[class.mat-chip-list-invalid]': 'errorState',
     '[class.mat-chip-list-required]': 'required',
-    'role': 'listbox',
     '[attr.aria-orientation]': 'ariaOrientation',
     'class': 'mat-chip-list',
     '(focus)': 'focus()',
     '(blur)': '_blur()',
-    '(keydown)': '_keydown($event)'
+    '(keydown)': '_keydown($event)',
+    '[id]': '_uid',
   },
-  providers: [{provide: MdFormFieldControl, useExisting: MdChipList}],
+  providers: [{provide: MatFormFieldControl, useExisting: MatChipList}],
   styleUrls: ['chips.css'],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor,
-    AfterContentInit, OnInit, OnDestroy {
-
+export class MatChipList extends _MatChipListMixinBase implements MatFormFieldControl<any>,
+  ControlValueAccessor, AfterContentInit, DoCheck, OnInit, OnDestroy, CanUpdateErrorState {
   /**
-   * Stream that emits whenever the state of the input changes such that the wrapping `MdFormField`
-   * needs to run change detection.
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
    */
-  stateChanges = new Subject<void>();
+  readonly controlType: string = 'mat-chip-list';
 
   /** When a chip is destroyed, we track the index so we can focus the appropriate next chip. */
   protected _lastDestroyedIndex: number|null = null;
 
   /** Track which chips we're listening to for focus/destruction. */
-  protected _chipSet: WeakMap<MdChip, boolean> = new WeakMap();
+  protected _chipSet: WeakMap<MatChip, boolean> = new WeakMap();
 
   /** Subscription to tabbing out from the chip list. */
   private _tabOutSubscription = Subscription.EMPTY;
@@ -107,45 +115,25 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   private _changeSubscription: Subscription;
 
   /** Subscription to focus changes in the chips. */
-  private _chipFocusSubscription: Subscription|null;
+  private _chipFocusSubscription: Subscription | null;
 
   /** Subscription to blur changes in the chips. */
-  private _chipBlurSubscription: Subscription|null;
+  private _chipBlurSubscription: Subscription | null;
 
   /** Subscription to selection changes in chips. */
-  private _chipSelectionSubscription: Subscription|null;
+  private _chipSelectionSubscription: Subscription | null;
 
   /** Subscription to remove changes in chips. */
-  private _chipRemoveSubscription: Subscription|null;
-
-  /** Whether or not the chip is selectable. */
-  protected _selectable: boolean = true;
-
-  /** Whether the component is in multiple selection mode. */
-  private _multiple: boolean = false;
+  private _chipRemoveSubscription: Subscription | null;
 
   /** The chip input to add more chips */
-  protected _chipInput: MdChipInput;
-
-  /** The aria-describedby attribute on the chip list for improved a11y. */
-  protected _ariaDescribedby: string;
-
-  /** Id of the chip list */
-  protected _id: string;
+  protected _chipInput: MatChipInput;
 
   /** Uid of the chip list */
-  protected _uid: string = `md-chip-list-${nextUniqueId++}`;
+  _uid: string = `mat-chip-list-${nextUniqueId++}`;
 
-  /** Whether this is required */
-  protected _required: boolean = false;
-
-  /** Whether this is disabled */
-  protected _disabled: boolean = false;
-
-  protected _value: any;
-
-  /** Placeholder for the chip list. Alternatively, placeholder can be set on MdChipInput */
-  protected _placeholder: string;
+  /** The aria-describedby attribute on the chip list for improved a11y. */
+  _ariaDescribedby: string;
 
   /** Tab index for the chip list. */
   _tabIndex = 0;
@@ -157,7 +145,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   _userTabIndex: number | null = null;
 
   /** The FocusKeyManager which handles focus. */
-  _keyManager: FocusKeyManager<MdChip>;
+  _keyManager: FocusKeyManager<MatChip>;
 
   /** Function when touched */
   _onTouched = () => {};
@@ -165,15 +153,18 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   /** Function when changed */
   _onChange: (value: any) => void = () => {};
 
-  _selectionModel: SelectionModel<MdChip>;
-
-  /** Comparison function to specify which option is displayed. Defaults to object equality. */
-  private _compareWith = (o1: any, o2: any) => o1 === o2;
+  _selectionModel: SelectionModel<MatChip>;
 
   /** The array of selected chips inside chip list. */
-  get selected(): MdChip[] | MdChip {
+  get selected(): MatChip[] | MatChip {
     return this.multiple ? this._selectionModel.selected : this._selectionModel.selected[0];
   }
+
+  /** The ARIA role applied to the chip list. */
+  get role(): string | null { return this.empty ? null : 'listbox'; }
+
+  /** An object used to control when error messages are shown. */
+  @Input() errorStateMatcher: ErrorStateMatcher;
 
   /** Whether the user should be allowed to select multiple chips. */
   @Input()
@@ -181,6 +172,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   set multiple(value: boolean) {
     this._multiple = coerceBooleanProperty(value);
   }
+  private _multiple: boolean = false;
 
   /**
    * A function to compare the option values with the selected values. The first argument
@@ -188,7 +180,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
    * should be returned.
    */
   @Input()
-  get compareWith() { return this._compareWith; }
+  get compareWith(): (o1: any, o2: any) => boolean { return this._compareWith; }
   set compareWith(fn: (o1: any, o2: any) => boolean) {
     this._compareWith = fn;
     if (this._selectionModel) {
@@ -196,78 +188,99 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
       this._initializeSelection();
     }
   }
+  private _compareWith = (o1: any, o2: any) => o1 === o2;
 
-  /** Required for FormFieldControl */
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
   @Input()
-  get value() { return this._value; }
-  set value(newValue: any) {
-    this.writeValue(newValue);
-    this._value = newValue;
+  get value(): any { return this._value; }
+  set value(value: any) {
+    this.writeValue(value);
+    this._value = value;
+  }
+  protected _value: any;
+
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
+  get id(): string {
+    return this._chipInput ? this._chipInput.id : this._uid;
   }
 
-  /** Required for FormFieldControl. The ID of the chip list */
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
   @Input()
-  set id(value: string) {
-    this._id = value;
-    this.stateChanges.next();
-  }
-  get id() { return this._id || this._uid; }
-
-  /** Required for FormFieldControl. Whether the chip list is required. */
-  @Input()
-  set required(value: any) {
+  get required(): boolean { return this._required; }
+  set required(value: boolean) {
     this._required = coerceBooleanProperty(value);
     this.stateChanges.next();
   }
-  get required() {
-    return this._required;
-  }
+  protected _required: boolean = false;
 
-  /** For FormFieldControl. Use chip input's placholder if there's a chip input */
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
   @Input()
+  get placeholder(): string {
+    return this._chipInput ? this._chipInput.placeholder : this._placeholder;
+  }
   set placeholder(value: string) {
     this._placeholder = value;
     this.stateChanges.next();
   }
-  get placeholder() {
-    return this._chipInput ? this._chipInput.placeholder : this._placeholder;
-  }
+  protected _placeholder: string;
 
-  /** Whether any chips or the mdChipInput inside of this chip-list has focus. */
-  get focused() {
+  /** Whether any chips or the matChipInput inside of this chip-list has focus. */
+  get focused(): boolean {
     return this.chips.some(chip => chip._hasFocus) ||
       (this._chipInput && this._chipInput.focused);
   }
 
-  /** Whether this chip-list contains no chips and no mdChipInput. */
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
   get empty(): boolean {
     return (!this._chipInput || this._chipInput.empty) && this.chips.length === 0;
   }
 
-  /** Whether this chip-list is disabled. */
-  @Input()
-  get disabled() { return this.ngControl ? this.ngControl.disabled : this._disabled; }
-  set disabled(value: any) { this._disabled = coerceBooleanProperty(value); }
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
+  get shouldLabelFloat(): boolean { return !this.empty || this.focused; }
 
-  /** Whether the chip list is in an error state. */
-  get errorState(): boolean {
-    const isInvalid = this.ngControl && this.ngControl.invalid;
-    const isTouched = this.ngControl && this.ngControl.touched;
-    const isSubmitted = (this._parentFormGroup && this._parentFormGroup.submitted) ||
-      (this._parentForm && this._parentForm.submitted);
-    return !!(isInvalid && (isTouched || isSubmitted));
-  }
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
+  @Input()
+  get disabled(): boolean { return this.ngControl ? !!this.ngControl.disabled : this._disabled; }
+  set disabled(value: boolean) { this._disabled = coerceBooleanProperty(value); }
+  protected _disabled: boolean = false;
 
   /** Orientation of the chip list. */
   @Input('aria-orientation') ariaOrientation: 'horizontal' | 'vertical' = 'horizontal';
 
   /**
-   * Whether or not this chip is selectable. When a chip is not selectable,
-   * its selected state is always ignored.
+   * Whether or not this chip list is selectable. When a chip list is not selectable,
+   * the selected states for all the chips inside the chip list are always ignored.
    */
   @Input()
   get selectable(): boolean { return this._selectable; }
-  set selectable(value: boolean) { this._selectable = coerceBooleanProperty(value); }
+  set selectable(value: boolean) {
+    this._selectable = coerceBooleanProperty(value);
+    if (this.chips) {
+      this.chips.forEach(chip => chip.chipListSelectable = this._selectable);
+    }
+  }
+  protected _selectable: boolean = true;
 
   @Input()
   set tabIndex(value: number) {
@@ -276,53 +289,58 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   }
 
   /** Combined stream of all of the child chips' selection change events. */
-  get chipSelectionChanges(): Observable<MdChipSelectionChange> {
-    return merge(...this.chips.map(chip => chip.onSelectionChange));
+  get chipSelectionChanges(): Observable<MatChipSelectionChange> {
+    return merge(...this.chips.map(chip => chip.selectionChange));
   }
 
   /** Combined stream of all of the child chips' focus change events. */
-  get chipFocusChanges(): Observable<MdChipEvent> {
+  get chipFocusChanges(): Observable<MatChipEvent> {
     return merge(...this.chips.map(chip => chip._onFocus));
   }
 
   /** Combined stream of all of the child chips' blur change events. */
-  get chipBlurChanges(): Observable<MdChipEvent> {
+  get chipBlurChanges(): Observable<MatChipEvent> {
     return merge(...this.chips.map(chip => chip._onBlur));
   }
 
   /** Combined stream of all of the child chips' remove change events. */
-  get chipRemoveChanges(): Observable<MdChipEvent> {
-    return merge(...this.chips.map(chip => chip.destroy));
+  get chipRemoveChanges(): Observable<MatChipEvent> {
+    return merge(...this.chips.map(chip => chip.destroyed));
   }
 
   /** Event emitted when the selected chip list value has been changed by the user. */
-  @Output() change: EventEmitter<MdChipListChange> = new EventEmitter<MdChipListChange>();
+  @Output() readonly change: EventEmitter<MatChipListChange> =
+      new EventEmitter<MatChipListChange>();
 
   /**
    * Event that emits whenever the raw value of the chip-list changes. This is here primarily
    * to facilitate the two-way binding for the `value` input.
    * @docs-private
    */
-  @Output() valueChange = new EventEmitter<any>();
+  @Output() readonly valueChange: EventEmitter<any> = new EventEmitter<any>();
 
   /** The chip components contained within this chip list. */
-  @ContentChildren(MdChip) chips: QueryList<MdChip>;
+  @ContentChildren(MatChip) chips: QueryList<MatChip>;
 
-  constructor(protected _renderer: Renderer2,
-              protected _elementRef: ElementRef,
+  constructor(protected _elementRef: ElementRef,
               private _changeDetectorRef: ChangeDetectorRef,
               @Optional() private _dir: Directionality,
-              @Optional() private _parentForm: NgForm,
-              @Optional() private _parentFormGroup: FormGroupDirective,
+              @Optional() _parentForm: NgForm,
+              @Optional() _parentFormGroup: FormGroupDirective,
+              _defaultErrorStateMatcher: ErrorStateMatcher,
+              /** @docs-private */
               @Optional() @Self() public ngControl: NgControl) {
+    super(_defaultErrorStateMatcher, _parentForm, _parentFormGroup, ngControl);
     if (this.ngControl) {
       this.ngControl.valueAccessor = this;
     }
   }
 
-  ngAfterContentInit(): void {
-
-    this._keyManager = new FocusKeyManager<MdChip>(this.chips).withWrap();
+  ngAfterContentInit() {
+    this._keyManager = new FocusKeyManager<MatChip>(this.chips)
+      .withWrap()
+      .withVerticalOrientation()
+      .withHorizontalOrientation(this._dir ? this._dir.value : 'ltr');
 
     // Prevents the chip list from capturing focus and redirecting
     // it back to the first chip when the user tabs out.
@@ -332,7 +350,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
     });
 
     // When the list changes, re-subscribe
-    this._changeSubscription = startWith.call(this.chips.changes, null).subscribe(() => {
+    this._changeSubscription = this.chips.changes.pipe(startWith(null)).subscribe(() => {
       this._resetChips();
 
       // Reset chips selected/deselected status
@@ -343,61 +361,87 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
 
       // Check to see if we have a destroyed chip and need to refocus
       this._updateFocusForDestroyedChips();
+
+      this.stateChanges.next();
     });
   }
 
   ngOnInit() {
-    this._selectionModel = new SelectionModel<MdChip>(this.multiple, undefined, false);
+    this._selectionModel = new SelectionModel<MatChip>(this.multiple, undefined, false);
     this.stateChanges.next();
   }
 
-  ngOnDestroy(): void {
+  ngDoCheck() {
+    if (this.ngControl) {
+      // We need to re-evaluate this on every change detection cycle, because there are some
+      // error triggers that we can't subscribe to (e.g. parent form submissions). This means
+      // that whatever logic is in here has to be super lean or we risk destroying the performance.
+      this.updateErrorState();
+    }
+  }
+
+  ngOnDestroy() {
     this._tabOutSubscription.unsubscribe();
 
     if (this._changeSubscription) {
       this._changeSubscription.unsubscribe();
     }
+
+    if (this._chipRemoveSubscription) {
+      this._chipRemoveSubscription.unsubscribe();
+    }
+
     this._dropSubscriptions();
+    this.stateChanges.complete();
   }
 
 
   /** Associates an HTML input element with this chip list. */
-  registerInput(inputElement: MdChipInput) {
+  registerInput(inputElement: MatChipInput): void {
     this._chipInput = inputElement;
   }
 
-  // Implemented as part of MdFormFieldControl.
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
   setDescribedByIds(ids: string[]) { this._ariaDescribedby = ids.join(' '); }
 
-  // Implemented as part of ControlValueAccessor
+  // Implemented as part of ControlValueAccessor.
   writeValue(value: any): void {
     if (this.chips) {
       this._setSelectionByValue(value, false);
     }
   }
 
-  // Implemented as part of ControlValueAccessor
+  // Implemented as part of ControlValueAccessor.
   registerOnChange(fn: (value: any) => void): void {
     this._onChange = fn;
   }
 
-  // Implemented as part of ControlValueAccessor
+  // Implemented as part of ControlValueAccessor.
   registerOnTouched(fn: () => void): void {
     this._onTouched = fn;
   }
 
-  // Implemented as part of ControlValueAccessor
-  setDisabledState(disabled: boolean): void {
-    this.disabled = disabled;
-    this._renderer.setProperty(this._elementRef.nativeElement, 'disabled', disabled);
+  // Implemented as part of ControlValueAccessor.
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled = isDisabled;
+    this._elementRef.nativeElement.disabled = isDisabled;
     this.stateChanges.next();
   }
+
+  /**
+   * Implemented as part of MatFormFieldControl.
+   * @docs-private
+   */
+  onContainerClick() { this.focus(); }
 
   /**
    * Focuses the the first non-disabled chip in this chip list, or the associated input when there
    * are no eligible chips.
    */
-  focus() {
+  focus(): void {
     // TODO: ARIA says this should focus the first `selected` chip if any are selected.
     // Focus on first element if there's no chipInput inside chip-list
     if (this._chipInput && this._chipInput.focused) {
@@ -422,35 +466,16 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
    * Pass events to the keyboard manager. Available here for tests.
    */
   _keydown(event: KeyboardEvent) {
-    let code = event.keyCode;
-    let target = event.target as HTMLElement;
-    let isInputEmpty = this._isInputEmpty(target);
-    let isRtl = this._dir && this._dir.value == 'rtl';
+    const target = event.target as HTMLElement;
 
-    let isPrevKey = (code === (isRtl ? RIGHT_ARROW : LEFT_ARROW));
-    let isNextKey = (code === (isRtl ? LEFT_ARROW : RIGHT_ARROW));
-    let isBackKey = (code === BACKSPACE || code == DELETE || code == UP_ARROW || isPrevKey);
-    // If they are on an empty input and hit backspace/delete/left arrow, focus the last chip
-    if (isInputEmpty && isBackKey) {
+    // If they are on an empty input and hit backspace, focus the last chip
+    if (event.keyCode === BACKSPACE && this._isInputEmpty(target)) {
       this._keyManager.setLastItemActive();
       event.preventDefault();
-      return;
+    } else if (target && target.classList.contains('mat-chip')) {
+      this._keyManager.onKeydown(event);
+      this.stateChanges.next();
     }
-
-    // If they are on a chip, check for space/left/right, otherwise pass to our key manager (like
-    // up/down keys)
-    if (target && target.classList.contains('mat-chip')) {
-      if (isPrevKey) {
-        this._keyManager.setPreviousItemActive();
-        event.preventDefault();
-      } else if (isNextKey) {
-        this._keyManager.setNextItemActive();
-        event.preventDefault();
-      } else {
-        this._keyManager.onKeydown(event);
-      }
-    }
-    this.stateChanges.next();
   }
 
 
@@ -468,7 +493,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
    * Otherwise focus the next chip in the list.
    * Save `_lastDestroyedIndex` so we can set the correct focus.
    */
-  protected _updateKeyManager(chip: MdChip) {
+  protected _updateKeyManager(chip: MatChip) {
     let chipIndex: number = this.chips.toArray().indexOf(chip);
     if (this._isValidIndex(chipIndex)) {
       if (chip._hasFocus) {
@@ -492,7 +517,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   protected _updateFocusForDestroyedChips() {
     let chipsArray = this.chips;
 
-    if (this._lastDestroyedIndex != null && chipsArray.length > 0) {
+    if (this._lastDestroyedIndex != null && chipsArray.length > 0 && this.focused) {
       // Check whether the destroyed chip was the last item
       const newFocusIndex = Math.min(this._lastDestroyedIndex, chipsArray.length - 1);
       this._keyManager.setActiveItem(newFocusIndex);
@@ -501,8 +526,6 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
       if (focusChip) {
         focusChip.focus();
       }
-    } else if (chipsArray.length === 0) {
-      this._focusInput();
     }
 
     // Reset our destroyed index
@@ -522,7 +545,6 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
   private _isInputEmpty(element: HTMLElement): boolean {
     if (element && element.nodeName.toLowerCase() === 'input') {
       let input = element as HTMLInputElement;
-
       return !input.value;
     }
 
@@ -542,7 +564,9 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
       // Shift focus to the active item. Note that we shouldn't do this in multiple
       // mode, because we don't know what chip the user interacted with last.
       if (correspondingChip) {
-        this._keyManager.setActiveItem(this.chips.toArray().indexOf(correspondingChip));
+        if (isUserInput) {
+          this._keyManager.setActiveItem(correspondingChip);
+        }
       }
     }
   }
@@ -551,7 +575,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
    * Finds and selects the chip based on its value.
    * @returns Chip that has the corresponding value.
    */
-  private _selectValue(value: any, isUserInput: boolean = true): MdChip | undefined {
+  private _selectValue(value: any, isUserInput: boolean = true): MatChip | undefined {
 
     const correspondingChip = this.chips.find(chip => {
       return chip.value != null && this._compareWith(chip.value,  value);
@@ -569,8 +593,10 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
     // Defer setting the value in order to avoid the "Expression
     // has changed after it was checked" errors from Angular.
     Promise.resolve().then(() => {
-      this._setSelectionByValue(this.ngControl ? this.ngControl.value : this._value, false);
-      this.stateChanges.next();
+      if (this.ngControl || this._value) {
+        this._setSelectionByValue(this.ngControl ? this.ngControl.value : this._value, false);
+        this.stateChanges.next();
+      }
     });
   }
 
@@ -578,7 +604,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
    * Deselects every chip in the list.
    * @param skip Chip that should not be deselected.
    */
-  private _clearSelection(skip?: MdChip): void {
+  private _clearSelection(skip?: MatChip): void {
     this._selectionModel.clear();
     this.chips.forEach(chip => {
       if (chip !== skip) {
@@ -615,7 +641,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
       valueToEmit = this.selected ? this.selected.value : fallbackValue;
     }
     this._value = valueToEmit;
-    this.change.emit(new MdChipListChange(this, valueToEmit));
+    this.change.emit(new MatChipListChange(this, valueToEmit));
     this.valueChange.emit(valueToEmit);
     this._onChange(valueToEmit);
     this._changeDetectorRef.markForCheck();
@@ -623,6 +649,7 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
 
   /** When blurred, mark the field as touched when focus moved outside the chip list. */
   _blur() {
+    this._keyManager.setActiveItem(-1);
     if (!this.disabled) {
       if (this._chipInput) {
         // If there's a chip input, we should check whether the focus moved to chip input.
@@ -706,14 +733,14 @@ export class MdChipList implements MdFormFieldControl<any>, ControlValueAccessor
       this.stateChanges.next();
     });
 
-    this._chipBlurSubscription = this.chipBlurChanges.subscribe(_ => {
+    this._chipBlurSubscription = this.chipBlurChanges.subscribe(() => {
       this._blur();
       this.stateChanges.next();
     });
   }
 
   private _listenToChipsRemoved(): void {
-    this._chipRemoveSubscription = this.chipRemoveChanges.subscribe((event) => {
+    this._chipRemoveSubscription = this.chipRemoveChanges.subscribe(event => {
       this._updateKeyManager(event.chip);
     });
   }

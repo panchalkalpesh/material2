@@ -1,22 +1,48 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Inject, Injectable, Optional} from '@angular/core';
+import {Inject, Injectable, Optional, InjectionToken} from '@angular/core';
 import {DateAdapter, MAT_DATE_LOCALE} from '@angular/material';
-
 // Depending on whether rollup is used, moment needs to be imported differently.
 // Since Moment.js doesn't have a default export, we normally need to import using the `* as`
 // syntax. However, rollup creates a synthetic default module and we thus need to import it using
 // the `default as` syntax.
 // TODO(mmalerba): See if we can clean this up at some point.
-import {default as _rollupMoment, Moment} from 'moment';
 import * as _moment from 'moment';
+// tslint:disable-next-line:no-duplicate-imports
+import {default as _rollupMoment, Moment} from 'moment';
+
 const moment = _rollupMoment || _moment;
+
+/** Configurable options for {@see MomentDateAdapter}. */
+export interface MatMomentDateAdapterOptions {
+  /**
+   * Turns the use of utc dates on or off.
+   * Changing this will change how Angular Material components like DatePicker output dates.
+   * {@default false}
+   */
+  useUtc: boolean;
+}
+
+/** InjectionToken for moment date adapter to configure options. */
+export const MAT_MOMENT_DATE_ADAPTER_OPTIONS = new InjectionToken<MatMomentDateAdapterOptions>(
+  'MAT_MOMENT_DATE_ADAPTER_OPTIONS', {
+    providedIn: 'root',
+    factory: MAT_MOMENT_DATE_ADAPTER_OPTIONS_FACTORY
+});
+
+
+/** @docs-private */
+export function MAT_MOMENT_DATE_ADAPTER_OPTIONS_FACTORY(): MatMomentDateAdapterOptions {
+  return {
+    useUtc: false
+  };
+}
 
 
 /** Creates an array and fills it with values. */
@@ -47,7 +73,10 @@ export class MomentDateAdapter extends DateAdapter<Moment> {
     narrowDaysOfWeek: string[]
   };
 
-  constructor(@Optional() @Inject(MAT_DATE_LOCALE) dateLocale: string) {
+  constructor(@Optional() @Inject(MAT_DATE_LOCALE) dateLocale: string,
+    @Optional() @Inject(MAT_MOMENT_DATE_ADAPTER_OPTIONS)
+    private options?: MatMomentDateAdapterOptions) {
+
     super();
     this.setLocale(dateLocale || moment.locale());
   }
@@ -129,7 +158,12 @@ export class MomentDateAdapter extends DateAdapter<Moment> {
       throw Error(`Invalid date "${date}". Date has to be greater than 0.`);
     }
 
-    let result = moment({year, month, date}).locale(this.locale);
+    let result;
+    if (this.options && this.options.useUtc) {
+      result = moment.utc({ year, month, date }).locale(this.locale);
+    } else {
+      result = moment({ year, month, date }).locale(this.locale);
+    }
 
     // If the result isn't valid, the date must have been out of bounds for this month.
     if (!result.isValid()) {
@@ -170,8 +204,30 @@ export class MomentDateAdapter extends DateAdapter<Moment> {
     return this.clone(date).add({days});
   }
 
-  getISODateString(date: Moment): string {
+  toIso8601(date: Moment): string {
     return this.clone(date).format();
+  }
+
+  /**
+   * Returns the given value if given a valid Moment or null. Deserializes valid ISO 8601 strings
+   * (https://www.ietf.org/rfc/rfc3339.txt) and valid Date objects into valid Moments and empty
+   * string into null. Returns an invalid date for all other values.
+   */
+  deserialize(value: any): Moment | null {
+    let date;
+    if (value instanceof Date) {
+      date = moment(value);
+    }
+    if (typeof value === 'string') {
+      if (!value) {
+        return null;
+      }
+      date = moment(value, moment.ISO_8601).locale(this.locale);
+    }
+    if (date && this.isValid(date)) {
+      return date;
+    }
+    return super.deserialize(value);
   }
 
   isDateInstance(obj: any): boolean {
@@ -180,5 +236,9 @@ export class MomentDateAdapter extends DateAdapter<Moment> {
 
   isValid(date: Moment): boolean {
     return this.clone(date).isValid();
+  }
+
+  invalid(): Moment {
+    return moment.invalid();
   }
 }

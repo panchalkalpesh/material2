@@ -1,14 +1,26 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Component, ViewEncapsulation, Input, ChangeDetectionStrategy} from '@angular/core';
+import {
+  Component,
+  ViewEncapsulation,
+  Input,
+  ChangeDetectionStrategy,
+  Inject,
+  Optional,
+} from '@angular/core';
+import {ANIMATION_MODULE_TYPE} from '@angular/platform-browser/animations';
 
-export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
+/**
+ * Possible states for a pseudo checkbox.
+ * @docs-private
+ */
+export type MatPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
 
 /**
  * Component that shows a simplified checkbox without including any kind of "real" checkbox.
@@ -18,16 +30,16 @@ export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
  * `mat-primary .mat-pseudo-checkbox`.
  *
  * Note that this component will be completely invisible to screen-reader users. This is *not*
- * interchangeable with <md-checkbox> and should *not* be used if the user would directly interact
- * with the checkbox. The pseudo-checkbox should only be used as an implementation detail of
- * more complex components that appropriately handle selected / checked state.
+ * interchangeable with `<mat-checkbox>` and should *not* be used if the user would directly
+ * interact with the checkbox. The pseudo-checkbox should only be used as an implementation detail
+ * of more complex components that appropriately handle selected / checked state.
  * @docs-private
  */
 @Component({
   moduleId: module.id,
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  selector: 'md-pseudo-checkbox, mat-pseudo-checkbox',
+  selector: 'mat-pseudo-checkbox',
   styleUrls: ['pseudo-checkbox.css'],
   template: '',
   host: {
@@ -35,12 +47,15 @@ export type MdPseudoCheckboxState = 'unchecked' | 'checked' | 'indeterminate';
     '[class.mat-pseudo-checkbox-indeterminate]': 'state === "indeterminate"',
     '[class.mat-pseudo-checkbox-checked]': 'state === "checked"',
     '[class.mat-pseudo-checkbox-disabled]': 'disabled',
+    '[class._mat-animation-noopable]': '_animationMode === "NoopAnimations"',
   },
 })
-export class MdPseudoCheckbox {
+export class MatPseudoCheckbox {
   /** Display state of the checkbox. */
-  @Input() state: MdPseudoCheckboxState = 'unchecked';
+  @Input() state: MatPseudoCheckboxState = 'unchecked';
 
   /** Whether the checkbox is disabled. */
   @Input() disabled: boolean = false;
+
+  constructor(@Optional() @Inject(ANIMATION_MODULE_TYPE) public _animationMode?: string) { }
 }

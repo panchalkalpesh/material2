@@ -1,45 +1,53 @@
-<h2 md-dialog-title>Company</h2>
+<h2 mat-dialog-title>Company</h2>
 
-<md-dialog-content>
-  <form class="example-form">
-    <md-form-field class="example-full-width">
-      <input mdInput placeholder="Company (disabled)" disabled value="Google">
-    </md-form-field>
+<mat-dialog-content>
+  <form>
+    <mat-form-field class="demo-full-width">
+      <mat-label>Company (disabled)</mat-label>
+      <input matInput disabled value="Google">
+    </mat-form-field>
 
-    <table class="example-full-width" cellspacing="0"><tr>
-      <td><md-form-field class="example-full-width">
-        <input mdInput placeholder="First name">
-      </md-form-field></td>
-      <td><md-form-field class="example-full-width">
-        <input mdInput placeholder="Long Last Name That Will Be Truncated">
-      </md-form-field></td>
+    <table class="demo-full-width" cellspacing="0"><tr>
+      <td><mat-form-field class="demo-full-width">
+        <mat-label>First name</mat-label>
+        <input matInput>
+      </mat-form-field></td>
+      <td><mat-form-field class="demo-full-width">
+        <mat-label>Long last name that will be truncated</mat-label>
+        <input matInput>
+      </mat-form-field></td>
     </tr></table>
 
     <p>
-      <md-form-field class="example-full-width">
-        <textarea mdInput placeholder="Address">1600 Amphitheatre Pkwy</textarea>
-      </md-form-field>
-      <md-form-field class="example-full-width">
-        <textarea mdInput placeholder="Address 2"></textarea>
-      </md-form-field>
+      <mat-form-field class="demo-full-width">
+        <mat-label>Address</mat-label>
+        <textarea matInput>1600 Amphitheatre Pkwy</textarea>
+      </mat-form-field>
+      <mat-form-field class="demo-full-width">
+        <mat-label>Address 2</mat-label>
+        <textarea matInput></textarea>
+      </mat-form-field>
     </p>
 
-    <table class="example-full-width" cellspacing="0"><tr>
-      <td><md-form-field class="example-full-width">
-        <input mdInput placeholder="City">
-      </md-form-field></td>
-      <td><md-form-field class="example-full-width">
-        <input mdInput placeholder="State">
-      </md-form-field></td>
-      <td><md-form-field class="example-full-width">
-        <input mdInput #postalCode maxlength="5" placeholder="Postal Code" value="94043">
-        <md-hint align="end">{{postalCode.value.length}} / 5</md-hint>
-      </md-form-field></td>
+    <table class="demo-full-width" cellspacing="0"><tr>
+      <td><mat-form-field class="demo-full-width">
+        <mat-label>City</mat-label>
+        <input matInput>
+      </mat-form-field></td>
+      <td><mat-form-field class="demo-full-width">
+        <mat-label>State</mat-label>
+        <input matInput>
+      </mat-form-field></td>
+      <td><mat-form-field class="demo-full-width">
+        <mat-label>Postal code</mat-label>
+        <input matInput #postalCode maxlength="5" value="94043">
+        <mat-hint align="end">{{postalCode.value.length}} / 5</mat-hint>
+      </mat-form-field></td>
     </tr></table>
   </form>
-</md-dialog-content>
+</mat-dialog-content>
 
-<md-dialog-actions>
-  <button md-raised-button color="primary" md-dialog-close>Submit</button>
-  <button md-raised-button md-dialog-close>Close</button>
-</md-dialog-actions>
+<mat-dialog-actions>
+  <button mat-raised-button mat-dialog-close>Close</button>
+  <button mat-raised-button color="primary" mat-dialog-close cdkFocusInitial>Submit</button>
+</mat-dialog-actions>

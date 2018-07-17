@@ -2,8 +2,7 @@
   <thead class="mat-calendar-table-header">
     <tr><th class="mat-calendar-table-header-divider" colspan="4"></th></tr>
   </thead>
-  <tbody md-calendar-body
-         role="grid"
+  <tbody mat-calendar-body
          allowDisabledSelection="true"
          [label]="_yearLabel"
          [rows]="_months"
@@ -13,6 +12,7 @@
          [numCols]="4"
          [cellAspectRatio]="4 / 7"
          [activeCell]="_dateAdapter.getMonth(activeDate)"
-         (selectedValueChange)="_monthSelected($event)">
+         (selectedValueChange)="_monthSelected($event)"
+         (keydown)="_handleCalendarBodyKeydown($event)">
   </tbody>
 </table>

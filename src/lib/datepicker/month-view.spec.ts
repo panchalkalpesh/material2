@@ -1,25 +1,43 @@
-import {async, ComponentFixture, TestBed} from '@angular/core/testing';
+import {Direction, Directionality} from '@angular/cdk/bidi';
+import {
+  DOWN_ARROW,
+  END,
+  ENTER,
+  HOME,
+  LEFT_ARROW,
+  PAGE_DOWN,
+  PAGE_UP,
+  RIGHT_ARROW,
+  UP_ARROW,
+} from '@angular/cdk/keycodes';
+import {dispatchFakeEvent, dispatchKeyboardEvent} from '@angular/cdk/testing';
 import {Component} from '@angular/core';
+import {async, ComponentFixture, TestBed} from '@angular/core/testing';
+import {DEC, FEB, JAN, MAR, MatNativeDateModule, NOV} from '@angular/material/core';
 import {By} from '@angular/platform-browser';
-import {MdMonthView} from './month-view';
-import {MdCalendarBody} from './calendar-body';
-import {MdNativeDateModule} from '@angular/material/core';
-import {JAN, MAR} from '@angular/material/core';
+import {MatCalendarBody} from './calendar-body';
+import {MatMonthView} from './month-view';
 
-describe('MdMonthView', () => {
+
+describe('MatMonthView', () => {
+  let dir: {value: Direction};
+
   beforeEach(async(() => {
     TestBed.configureTestingModule({
       imports: [
-        MdNativeDateModule,
+        MatNativeDateModule,
       ],
       declarations: [
-        MdCalendarBody,
-        MdMonthView,
+        MatCalendarBody,
+        MatMonthView,
 
         // Test components.
         StandardMonthView,
         MonthViewWithDateFilter,
       ],
+      providers: [
+        {provide: Directionality, useFactory: () => dir = {value: 'ltr'}}
+      ]
     });
 
     TestBed.compileComponents();
@@ -34,7 +52,7 @@ describe('MdMonthView', () => {
       fixture = TestBed.createComponent(StandardMonthView);
       fixture.detectChanges();
 
-      let monthViewDebugElement = fixture.debugElement.query(By.directive(MdMonthView));
+      let monthViewDebugElement = fixture.debugElement.query(By.directive(MatMonthView));
       monthViewNativeElement = monthViewDebugElement.nativeElement;
       testComponent = fixture.componentInstance;
     });
@@ -76,20 +94,182 @@ describe('MdMonthView', () => {
       expect((cellEls[4] as HTMLElement).innerText.trim()).toBe('5');
       expect(cellEls[4].classList).toContain('mat-calendar-body-active');
     });
+
+    describe('a11y', () => {
+      describe('calendar body', () => {
+        let calendarBodyEl: HTMLElement;
+        let calendarInstance: StandardMonthView;
+
+        beforeEach(() => {
+          calendarInstance = fixture.componentInstance;
+          calendarBodyEl =
+            fixture.debugElement.nativeElement.querySelector('.mat-calendar-body') as HTMLElement;
+          expect(calendarBodyEl).not.toBeNull();
+          dir.value = 'ltr';
+          fixture.componentInstance.date = new Date(2017, JAN, 5);
+          dispatchFakeEvent(calendarBodyEl, 'focus');
+          fixture.detectChanges();
+        });
+
+        it('should decrement date on left arrow press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
+          fixture.detectChanges();
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 4));
+
+          calendarInstance.date = new Date(2017, JAN, 1);
+          fixture.detectChanges();
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, DEC, 31));
+        });
+
+        it('should increment date on left arrow press in rtl', () => {
+          dir.value = 'rtl';
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 6));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 7));
+        });
+
+        it('should increment date on right arrow press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', RIGHT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 6));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', RIGHT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 7));
+        });
+
+        it('should decrement date on right arrow press in rtl', () => {
+          dir.value = 'rtl';
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', RIGHT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 4));
+
+          calendarInstance.date = new Date(2017, JAN, 1);
+          fixture.detectChanges();
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', RIGHT_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, DEC, 31));
+        });
+
+        it('should go up a row on up arrow press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', UP_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, DEC, 29));
+
+          calendarInstance.date = new Date(2017, JAN, 7);
+          fixture.detectChanges();
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', UP_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, DEC, 31));
+        });
+
+        it('should go down a row on down arrow press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', DOWN_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 12));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', DOWN_ARROW);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 19));
+        });
+
+        it('should go to beginning of the month on home press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', HOME);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 1));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', HOME);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 1));
+        });
+
+        it('should go to end of the month on end press', () => {
+          calendarInstance.date = new Date(2017, JAN, 10);
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', END);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 31));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', END);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, JAN, 31));
+        });
+
+        it('should go back one month on page up press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', PAGE_UP);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, DEC, 5));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', PAGE_UP);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2016, NOV, 5));
+        });
+
+        it('should go forward one month on page down press', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', PAGE_DOWN);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, FEB, 5));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', PAGE_DOWN);
+          fixture.detectChanges();
+
+          expect(calendarInstance.date).toEqual(new Date(2017, MAR, 5));
+        });
+
+        it('should select active date on enter', () => {
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', LEFT_ARROW);
+          fixture.detectChanges();
+
+          expect(testComponent.selected).toEqual(new Date(2017, JAN, 10));
+
+          dispatchKeyboardEvent(calendarBodyEl, 'keydown', ENTER);
+          fixture.detectChanges();
+
+          expect(testComponent.selected).toEqual(new Date(2017, JAN, 4));
+        });
+      });
+    });
   });
 
   describe('month view with date filter', () => {
     let fixture: ComponentFixture<MonthViewWithDateFilter>;
-    let testComponent: MonthViewWithDateFilter;
     let monthViewNativeElement: Element;
 
     beforeEach(() => {
       fixture = TestBed.createComponent(MonthViewWithDateFilter);
       fixture.detectChanges();
 
-      let monthViewDebugElement = fixture.debugElement.query(By.directive(MdMonthView));
+      let monthViewDebugElement = fixture.debugElement.query(By.directive(MatMonthView));
       monthViewNativeElement = monthViewDebugElement.nativeElement;
-      testComponent = fixture.componentInstance;
     });
 
     it('should disable filtered dates', () => {
@@ -102,7 +282,7 @@ describe('MdMonthView', () => {
 
 
 @Component({
-  template: `<md-month-view [activeDate]="date" [(selected)]="selected"></md-month-view>`,
+  template: `<mat-month-view [(activeDate)]="date" [(selected)]="selected"></mat-month-view>`,
 })
 class StandardMonthView {
   date = new Date(2017, JAN, 5);
@@ -111,7 +291,7 @@ class StandardMonthView {
 
 
 @Component({
-  template: `<md-month-view [activeDate]="activeDate" [dateFilter]="dateFilter"></md-month-view>`
+  template: `<mat-month-view [activeDate]="activeDate" [dateFilter]="dateFilter"></mat-month-view>`
 })
 class MonthViewWithDateFilter {
   activeDate = new Date(2017, JAN, 1);

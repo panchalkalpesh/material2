@@ -1,14 +1,13 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {animate, state, style, transition, trigger} from '@angular/animations';
+import {Directionality} from '@angular/cdk/bidi';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
-import {first, startWith} from '@angular/cdk/rxjs';
 import {
   AfterContentChecked,
   AfterContentInit,
@@ -20,59 +19,111 @@ import {
   ContentChildren,
   ElementRef,
   Inject,
+  InjectionToken,
   Input,
+  NgZone,
   Optional,
   QueryList,
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import {
-  FloatPlaceholderType,
-  MD_PLACEHOLDER_GLOBAL_OPTIONS,
-  PlaceholderOptions,
+  CanColor,
+  FloatLabelType,
+  LabelOptions,
+  MAT_LABEL_GLOBAL_OPTIONS,
+  mixinColor,
 } from '@angular/material/core';
-import {fromEvent} from 'rxjs/observable/fromEvent';
-import {MdError} from './error';
-import {MdFormFieldControl} from './form-field-control';
+import {EMPTY, fromEvent, merge} from 'rxjs';
+import {startWith, take} from 'rxjs/operators';
+import {MatError} from './error';
+import {matFormFieldAnimations} from './form-field-animations';
+import {MatFormFieldControl} from './form-field-control';
 import {
-  getMdFormFieldDuplicatedHintError,
-  getMdFormFieldMissingControlError,
-  getMdFormFieldPlaceholderConflictError,
+  getMatFormFieldDuplicatedHintError,
+  getMatFormFieldMissingControlError,
+  getMatFormFieldPlaceholderConflictError,
 } from './form-field-errors';
-import {MdHint} from './hint';
-import {MdPlaceholder} from './placeholder';
-import {MdPrefix} from './prefix';
-import {MdSuffix} from './suffix';
+import {MatHint} from './hint';
+import {MatLabel} from './label';
+import {MatPlaceholder} from './placeholder';
+import {MatPrefix} from './prefix';
+import {MatSuffix} from './suffix';
+import {Platform} from '@angular/cdk/platform';
+import {ANIMATION_MODULE_TYPE} from '@angular/platform-browser/animations';
 
 
 let nextUniqueId = 0;
+const floatingLabelScale = 0.75;
+const outlineGapPadding = 5;
+
+
+/**
+ * Boilerplate for applying mixins to MatFormField.
+ * @docs-private
+ */
+export class MatFormFieldBase {
+  constructor(public _elementRef: ElementRef) { }
+}
+
+/**
+ * Base class to which we're applying the form field mixins.
+ * @docs-private
+ */
+export const _MatFormFieldMixinBase = mixinColor(MatFormFieldBase, 'primary');
+
+/** Possible appearance styles for the form field. */
+export type MatFormFieldAppearance = 'legacy' | 'standard' | 'fill' | 'outline';
+
+/**
+ * Represents the default options form the form field that can be configured
+ * using the `MAT_FORM_FIELD_DEFAULT_OPTIONS` injection token.
+ */
+export interface MatFormFieldDefaultOptions {
+  appearance?: MatFormFieldAppearance;
+}
+
+/**
+ * Injection token that can be used to configure the
+ * default options for all form field within an app.
+ */
+export const MAT_FORM_FIELD_DEFAULT_OPTIONS =
+    new InjectionToken<MatFormFieldDefaultOptions>('MAT_FORM_FIELD_DEFAULT_OPTIONS');
 
 
 /** Container for form controls that applies Material Design styling and behavior. */
 @Component({
   moduleId: module.id,
-  // TODO(mmalerba): the input-container selectors and classes are deprecated and will be removed.
-  selector: 'md-input-container, mat-input-container, md-form-field, mat-form-field',
+  selector: 'mat-form-field',
+  exportAs: 'matFormField',
   templateUrl: 'form-field.html',
-  // MdInput is a directive and can't have styles, so we need to include its styles here.
-  // The MdInput styles are fairly minimal so it shouldn't be a big deal for people who aren't using
-  // MdInput.
-  styleUrls: ['form-field.css', '../input/input.css'],
-  animations: [
-    // TODO(mmalerba): Use angular animations for placeholder animation as well.
-    trigger('transitionMessages', [
-      state('enter', style({ opacity: 1, transform: 'translateY(0%)' })),
-      transition('void => enter', [
-        style({ opacity: 0, transform: 'translateY(-100%)' }),
-        animate('300ms cubic-bezier(0.55, 0, 0.55, 0.2)'),
-      ]),
-    ]),
+  // MatInput is a directive and can't have styles, so we need to include its styles here.
+  // The MatInput styles are fairly minimal so it shouldn't be a big deal for people who
+  // aren't using MatInput.
+  styleUrls: [
+    'form-field.css',
+    'form-field-fill.css',
+    'form-field-legacy.css',
+    'form-field-outline.css',
+    'form-field-standard.css',
+    '../input/input.css',
   ],
+  animations: [matFormFieldAnimations.transitionMessages],
   host: {
-    'class': 'mat-input-container mat-form-field',
-    '[class.mat-input-invalid]': '_control.errorState',
+    'class': 'mat-form-field',
+    '[class.mat-form-field-appearance-standard]': 'appearance == "standard"',
+    '[class.mat-form-field-appearance-fill]': 'appearance == "fill"',
+    '[class.mat-form-field-appearance-outline]': 'appearance == "outline"',
+    '[class.mat-form-field-appearance-legacy]': 'appearance == "legacy"',
     '[class.mat-form-field-invalid]': '_control.errorState',
+    '[class.mat-form-field-can-float]': '_canLabelFloat',
+    '[class.mat-form-field-should-float]': '_shouldLabelFloat()',
+    '[class.mat-form-field-hide-placeholder]': '_hideControlPlaceholder()',
+    '[class.mat-form-field-disabled]': '_control.disabled',
+    '[class.mat-form-field-autofilled]': '_control.autofilled',
     '[class.mat-focused]': '_control.focused',
+    '[class.mat-accent]': 'color == "accent"',
+    '[class.mat-warn]': 'color == "warn"',
     '[class.ng-untouched]': '_shouldForward("untouched")',
     '[class.ng-touched]': '_shouldForward("touched")',
     '[class.ng-pristine]': '_shouldForward("pristine")',
@@ -80,48 +131,57 @@ let nextUniqueId = 0;
     '[class.ng-valid]': '_shouldForward("valid")',
     '[class.ng-invalid]': '_shouldForward("invalid")',
     '[class.ng-pending]': '_shouldForward("pending")',
-    '(click)': '_control.focus()',
+    '[class._mat-animation-noopable]': '!_animationsEnabled',
   },
+  inputs: ['color'],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 
-export class MdFormField implements AfterViewInit, AfterContentInit, AfterContentChecked {
-  private _placeholderOptions: PlaceholderOptions;
+export class MatFormField extends _MatFormFieldMixinBase
+    implements AfterContentInit, AfterContentChecked, AfterViewInit, CanColor {
+  private _labelOptions: LabelOptions;
 
-  /** Color of the form field underline, based on the theme. */
-  @Input() color: 'primary' | 'accent' | 'warn' = 'primary';
-
-  /** @deprecated Use `color` instead. */
+  /** The form-field appearance style. */
   @Input()
-  get dividerColor() { return this.color; }
-  set dividerColor(value) { this.color = value; }
+  get appearance(): MatFormFieldAppearance {
+    return this._appearance || this._defaultOptions && this._defaultOptions.appearance || 'legacy';
+  }
+  set appearance(value: MatFormFieldAppearance) {
+    // If we're switching to `outline` from another appearance, we have to recalculate the gap.
+    if (value !== this._appearance && value === 'outline') {
+      this._initialGapCalculated = false;
+    }
+
+    this._appearance = value;
+  }
+  _appearance: MatFormFieldAppearance;
 
   /** Whether the required marker should be hidden. */
   @Input()
-  get hideRequiredMarker() { return this._hideRequiredMarker; }
-  set hideRequiredMarker(value: any) {
+  get hideRequiredMarker(): boolean { return this._hideRequiredMarker; }
+  set hideRequiredMarker(value: boolean) {
     this._hideRequiredMarker = coerceBooleanProperty(value);
   }
   private _hideRequiredMarker: boolean;
 
-  /** Override for the logic that disables the placeholder animation in certain cases. */
+  /** Override for the logic that disables the label animation in certain cases. */
   private _showAlwaysAnimate = false;
 
   /** Whether the floating label should always float or not. */
-  get _shouldAlwaysFloat() {
-    return this._floatPlaceholder === 'always' && !this._showAlwaysAnimate;
+  get _shouldAlwaysFloat(): boolean {
+    return this.floatLabel === 'always' && !this._showAlwaysAnimate;
   }
 
-  /** Whether the placeholder can float or not. */
-  get _canPlaceholderFloat() { return this._floatPlaceholder !== 'never'; }
+  /** Whether the label can float or not. */
+  get _canLabelFloat(): boolean { return this.floatLabel !== 'never'; }
 
-  /** State of the md-hint and md-error animations. */
+  /** State of the mat-hint and mat-error animations. */
   _subscriptAnimationState: string = '';
 
   /** Text for the form field hint. */
   @Input()
-  get hintLabel() { return this._hintLabel; }
+  get hintLabel(): string { return this._hintLabel; }
   set hintLabel(value: string) {
     this._hintLabel = value;
     this._processHints();
@@ -129,62 +189,108 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
   private _hintLabel = '';
 
   // Unique id for the hint label.
-  _hintLabelId: string = `md-hint-${nextUniqueId++}`;
+  _hintLabelId: string = `mat-hint-${nextUniqueId++}`;
 
-  /** Whether the placeholder should always float, never float or float as the user types. */
+  // Unique id for the internal form field label.
+  _labelId = `mat-form-field-label-${nextUniqueId++}`;
+
+  /**
+   * Whether the label should always float, never float or float as the user types.
+   *
+   * Note: only the legacy appearance supports the `never` option. `never` was originally added as a
+   * way to make the floating label emulate the behavior of a standard input placeholder. However
+   * the form field now supports both floating labels and placeholders. Therefore in the non-legacy
+   * appearances the `never` option has been disabled in favor of just using the placeholder.
+   */
   @Input()
-  get floatPlaceholder() { return this._floatPlaceholder; }
-  set floatPlaceholder(value: FloatPlaceholderType) {
-    if (value !== this._floatPlaceholder) {
-      this._floatPlaceholder = value || this._placeholderOptions.float || 'auto';
+  get floatLabel(): FloatLabelType {
+    return this.appearance !== 'legacy' && this._floatLabel === 'never' ? 'auto' : this._floatLabel;
+  }
+  set floatLabel(value: FloatLabelType) {
+    if (value !== this._floatLabel) {
+      this._floatLabel = value || this._labelOptions.float || 'auto';
       this._changeDetectorRef.markForCheck();
     }
   }
-  private _floatPlaceholder: FloatPlaceholderType;
+  private _floatLabel: FloatLabelType;
 
-  /** Reference to the form field's underline element. */
+  /** Whether the Angular animations are enabled. */
+  _animationsEnabled: boolean;
+
+  _outlineGapWidth = 0;
+  _outlineGapStart = 0;
+  _initialGapCalculated = false;
+
+  /**
+   * @deprecated
+   * @deletion-target 7.0.0
+   */
   @ViewChild('underline') underlineRef: ElementRef;
+
   @ViewChild('connectionContainer') _connectionContainerRef: ElementRef;
-  @ViewChild('placeholder') private _placeholder: ElementRef;
-  @ContentChild(MdFormFieldControl) _control: MdFormFieldControl<any>;
-  @ContentChild(MdPlaceholder) _placeholderChild: MdPlaceholder;
-  @ContentChildren(MdError) _errorChildren: QueryList<MdError>;
-  @ContentChildren(MdHint) _hintChildren: QueryList<MdHint>;
-  @ContentChildren(MdPrefix) _prefixChildren: QueryList<MdPrefix>;
-  @ContentChildren(MdSuffix) _suffixChildren: QueryList<MdSuffix>;
+  @ViewChild('inputContainer') _inputContainerRef: ElementRef;
+  @ViewChild('label') private _label: ElementRef;
+  @ContentChild(MatFormFieldControl) _control: MatFormFieldControl<any>;
+  @ContentChild(MatPlaceholder) _placeholderChild: MatPlaceholder;
+  @ContentChild(MatLabel) _labelChild: MatLabel;
+  @ContentChildren(MatError) _errorChildren: QueryList<MatError>;
+  @ContentChildren(MatHint) _hintChildren: QueryList<MatHint>;
+  @ContentChildren(MatPrefix) _prefixChildren: QueryList<MatPrefix>;
+  @ContentChildren(MatSuffix) _suffixChildren: QueryList<MatSuffix>;
 
   constructor(
-      public _elementRef: ElementRef, private _changeDetectorRef: ChangeDetectorRef,
-      @Optional() @Inject(MD_PLACEHOLDER_GLOBAL_OPTIONS) placeholderOptions: PlaceholderOptions) {
-    this._placeholderOptions = placeholderOptions ? placeholderOptions : {};
-    this.floatPlaceholder = this._placeholderOptions.float || 'auto';
+      public _elementRef: ElementRef,
+      private _changeDetectorRef: ChangeDetectorRef,
+      @Optional() @Inject(MAT_LABEL_GLOBAL_OPTIONS) labelOptions: LabelOptions,
+      @Optional() private _dir: Directionality,
+      @Optional() @Inject(MAT_FORM_FIELD_DEFAULT_OPTIONS) private _defaultOptions:
+          MatFormFieldDefaultOptions,
+      // @deletion-target 7.0.0 _platform, _ngZone and _animationMode to be made required.
+      private _platform?: Platform,
+      private _ngZone?: NgZone,
+      @Optional() @Inject(ANIMATION_MODULE_TYPE) _animationMode?: string) {
+    super(_elementRef);
+
+    this._labelOptions = labelOptions ? labelOptions : {};
+    this.floatLabel = this._labelOptions.float || 'auto';
+    this._animationsEnabled = _animationMode !== 'NoopAnimations';
+  }
+
+  /**
+   * Gets an ElementRef for the element that a overlay attached to the form-field should be
+   * positioned relative to.
+   */
+  getConnectedOverlayOrigin(): ElementRef {
+    return this._connectionContainerRef || this._elementRef;
   }
 
   ngAfterContentInit() {
     this._validateControlChild();
+    if (this._control.controlType) {
+      this._elementRef.nativeElement.classList
+          .add(`mat-form-field-type-${this._control.controlType}`);
+    }
 
     // Subscribe to changes in the child control state in order to update the form field UI.
-    startWith.call(this._control.stateChanges, null).subscribe(() => {
+    this._control.stateChanges.pipe(startWith(null!)).subscribe(() => {
       this._validatePlaceholders();
       this._syncDescribedByIds();
       this._changeDetectorRef.markForCheck();
     });
 
-    let ngControl = this._control.ngControl;
-    if (ngControl && ngControl.valueChanges) {
-      ngControl.valueChanges.subscribe(() => {
-        this._changeDetectorRef.markForCheck();
-      });
-    }
+    // Run change detection if the value, prefix, or suffix changes.
+    const valueChanges = this._control.ngControl && this._control.ngControl.valueChanges || EMPTY;
+    merge(valueChanges, this._prefixChildren.changes, this._suffixChildren.changes)
+        .subscribe(() => this._changeDetectorRef.markForCheck());
 
     // Re-validate when the number of hints changes.
-    startWith.call(this._hintChildren.changes, null).subscribe(() => {
+    this._hintChildren.changes.pipe(startWith(null)).subscribe(() => {
       this._processHints();
       this._changeDetectorRef.markForCheck();
     });
 
     // Update the aria-described by when the number of errors changes.
-    startWith.call(this._errorChildren.changes, null).subscribe(() => {
+    this._errorChildren.changes.pipe(startWith(null)).subscribe(() => {
       this._syncDescribedByIds();
       this._changeDetectorRef.markForCheck();
     });
@@ -192,6 +298,20 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
 
   ngAfterContentChecked() {
     this._validateControlChild();
+
+    if (!this._initialGapCalculated) {
+      // @deletion-target 7.0.0 Remove this check and else block once _ngZone is required.
+      if (this._ngZone) {
+        // It's important that we run this outside the `_ngZone`, because the `Promise.resolve`
+        // can kick us into an infinite change detection loop, if the `_initialGapCalculated`
+        // wasn't flipped on for some reason.
+        this._ngZone.runOutsideAngular(() => {
+          Promise.resolve().then(() => this.updateOutlineGap());
+        });
+      } else {
+        Promise.resolve().then(() => this.updateOutlineGap());
+      }
+    }
   }
 
   ngAfterViewInit() {
@@ -202,13 +322,31 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
 
   /** Determines whether a class from the NgControl should be forwarded to the host element. */
   _shouldForward(prop: string): boolean {
-    let ngControl = this._control ? this._control.ngControl : null;
-    return ngControl && (ngControl as any)[prop];
+    const ngControl = this._control ? this._control.ngControl : null;
+    return ngControl && ngControl[prop];
   }
 
-  /** Whether the form field has a placeholder. */
   _hasPlaceholder() {
-    return !!(this._control.placeholder || this._placeholderChild);
+    return !!(this._control && this._control.placeholder || this._placeholderChild);
+  }
+
+  _hasLabel() {
+    return !!this._labelChild;
+  }
+
+  _shouldLabelFloat() {
+    return this._canLabelFloat && (this._control.shouldLabelFloat || this._shouldAlwaysFloat);
+  }
+
+  _hideControlPlaceholder() {
+    // In the legacy appearance the placeholder is promoted to a label if no label is given.
+    return this.appearance === 'legacy' && !this._hasLabel() ||
+        this._hasLabel() && !this._shouldLabelFloat();
+  }
+
+  _hasFloatingLabel() {
+    // In the legacy appearance the placeholder is promoted to a label if no label is given.
+    return this._hasLabel() || this.appearance === 'legacy' && this._hasPlaceholder();
   }
 
   /** Determines whether to display hints or errors. */
@@ -218,26 +356,30 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
   }
 
   /** Animates the placeholder up and locks it in position. */
-  _animateAndLockPlaceholder(): void {
-    if (this._placeholder && this._canPlaceholderFloat) {
-      this._showAlwaysAnimate = true;
-      this._floatPlaceholder = 'always';
+  _animateAndLockLabel(): void {
+    if (this._hasFloatingLabel() && this._canLabelFloat) {
+      // If animations are disabled, we shouldn't go in here,
+      // because the `transitionend` will never fire.
+      if (this._animationsEnabled) {
+        this._showAlwaysAnimate = true;
 
-      first.call(fromEvent(this._placeholder.nativeElement, 'transitionend')).subscribe(() => {
-        this._showAlwaysAnimate = false;
-      });
+        fromEvent(this._label.nativeElement, 'transitionend').pipe(take(1)).subscribe(() => {
+          this._showAlwaysAnimate = false;
+        });
+      }
 
+      this.floatLabel = 'always';
       this._changeDetectorRef.markForCheck();
     }
   }
 
   /**
    * Ensure that there is only one placeholder (either `placeholder` attribute on the child control
-   * or child element with the `md-placeholder` directive).
+   * or child element with the `mat-placeholder` directive).
    */
   private _validatePlaceholders() {
     if (this._control.placeholder && this._placeholderChild) {
-      throw getMdFormFieldPlaceholderConflictError();
+      throw getMatFormFieldPlaceholderConflictError();
     }
   }
 
@@ -248,22 +390,22 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
   }
 
   /**
-   * Ensure that there is a maximum of one of each `<md-hint>` alignment specified, with the
+   * Ensure that there is a maximum of one of each `<mat-hint>` alignment specified, with the
    * attribute being considered as `align="start"`.
    */
   private _validateHints() {
     if (this._hintChildren) {
-      let startHint: MdHint;
-      let endHint: MdHint;
-      this._hintChildren.forEach((hint: MdHint) => {
-        if (hint.align == 'start') {
+      let startHint: MatHint;
+      let endHint: MatHint;
+      this._hintChildren.forEach((hint: MatHint) => {
+        if (hint.align === 'start') {
           if (startHint || this.hintLabel) {
-            throw getMdFormFieldDuplicatedHintError('start');
+            throw getMatFormFieldDuplicatedHintError('start');
           }
           startHint = hint;
-        } else if (hint.align == 'end') {
+        } else if (hint.align === 'end') {
           if (endHint) {
-            throw getMdFormFieldDuplicatedHintError('end');
+            throw getMatFormFieldDuplicatedHintError('end');
           }
           endHint = hint;
         }
@@ -295,7 +437,7 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
           ids.push(endHint.id);
         }
       } else if (this._errorChildren) {
-        ids = this._errorChildren.map(mdError => mdError.id);
+        ids = this._errorChildren.map(error => error.id);
       }
 
       this._control.setDescribedByIds(ids);
@@ -305,7 +447,45 @@ export class MdFormField implements AfterViewInit, AfterContentInit, AfterConten
   /** Throws an error if the form field's control is missing. */
   protected _validateControlChild() {
     if (!this._control) {
-      throw getMdFormFieldMissingControlError();
+      throw getMatFormFieldMissingControlError();
     }
+  }
+
+  /**
+   * Updates the width and position of the gap in the outline. Only relevant for the outline
+   * appearance.
+   */
+  updateOutlineGap() {
+    if (this.appearance === 'outline' && this._label && this._label.nativeElement.children.length) {
+      if (this._platform && !this._platform.isBrowser) {
+        // getBoundingClientRect isn't available on the server.
+        this._initialGapCalculated = true;
+        return;
+      }
+      if (!document.documentElement.contains(this._elementRef.nativeElement)) {
+        return;
+      }
+
+      const containerStart = this._getStartEnd(
+          this._connectionContainerRef.nativeElement.getBoundingClientRect());
+      const labelStart = this._getStartEnd(
+          this._label.nativeElement.children[0].getBoundingClientRect());
+      let labelWidth = 0;
+      for (const child of this._label.nativeElement.children) {
+        labelWidth += child.offsetWidth;
+      }
+      this._outlineGapStart = labelStart - containerStart - outlineGapPadding;
+      this._outlineGapWidth = labelWidth * floatingLabelScale + outlineGapPadding * 2;
+    } else {
+      this._outlineGapStart = 0;
+      this._outlineGapWidth = 0;
+    }
+    this._initialGapCalculated = true;
+    this._changeDetectorRef.markForCheck();
+  }
+
+  /** Gets the start end of the rect considering the current directionality. */
+  private _getStartEnd(rect: ClientRect): number {
+    return this._dir && this._dir.value === 'rtl' ? rect.right : rect.left;
   }
 }

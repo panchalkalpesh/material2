@@ -1,3 +1,11 @@
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {Component} from '@angular/core';
 
 
@@ -9,7 +17,7 @@ export interface Task {
 
 @Component({
   moduleId: module.id,
-  selector: 'md-checkbox-demo-nested-checklist',
+  selector: 'mat-checkbox-demo-nested-checklist',
   styles: [`
     li {
       margin-bottom: 4px;
@@ -17,38 +25,32 @@ export interface Task {
   `],
   templateUrl: 'nested-checklist.html',
 })
-export class MdCheckboxDemoNestedChecklist {
+export class MatCheckboxDemoNestedChecklist {
   tasks: Task[] = [
     {
       name: 'Reminders',
       completed: false,
       subtasks: [
-        { name: 'Cook Dinner', completed: false },
-        { name: 'Read the Material Design Spec', completed: false },
-        { name: 'Upgrade Application to Angular', completed: false }
+        {name: 'Cook Dinner', completed: false},
+        {name: 'Read the Material Design Spec', completed: false},
+        {name: 'Upgrade Application to Angular', completed: false}
       ]
     },
     {
       name: 'Groceries',
       completed: false,
       subtasks: [
-        { name: 'Organic Eggs', completed: false },
-        { name: 'Protein Powder', completed: false },
-        { name: 'Almond Meal Flour', completed: false }
+        {name: 'Organic Eggs', completed: false},
+        {name: 'Protein Powder', completed: false},
+        {name: 'Almond Meal Flour', completed: false}
       ]
     }
   ];
 
   allComplete(task: Task): boolean {
-    let subtasks = task.subtasks;
+    const subtasks = task.subtasks;
 
-    if (!subtasks) {
-      return false;
-    }
-
-    return subtasks.every(t => t.completed) ? true
-        : subtasks.every(t => !t.completed) ? false
-        : task.completed;
+    return task.completed || (subtasks != null && subtasks.every(t => t.completed));
   }
 
   someComplete(tasks: Task[]): boolean {
@@ -63,7 +65,7 @@ export class MdCheckboxDemoNestedChecklist {
 
 @Component({
   moduleId: module.id,
-  selector: 'md-checkbox-demo',
+  selector: 'mat-checkbox-demo',
   templateUrl: 'checkbox-demo.html',
   styleUrls: ['checkbox-demo.css'],
 })
@@ -71,7 +73,7 @@ export class CheckboxDemo {
   isIndeterminate: boolean = false;
   isChecked: boolean = false;
   isDisabled: boolean = false;
-  alignment: string = 'start';
+  labelPosition: string = 'after';
   useAlternativeColor: boolean = false;
 
   printResult() {

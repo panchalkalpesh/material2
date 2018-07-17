@@ -1,25 +1,36 @@
-import {fakeAsync, async, tick, ComponentFixture, TestBed} from '@angular/core/testing';
+import {
+  fakeAsync,
+  async,
+  tick,
+  ComponentFixture,
+  TestBed,
+  discardPeriodicTasks,
+  flush,
+} from '@angular/core/testing';
 import {Component, ElementRef, ViewChild} from '@angular/core';
 import {By} from '@angular/platform-browser';
-import {NoopAnimationsModule} from '@angular/platform-browser/animations';
-import {MdDrawer, MdSidenavModule, MdDrawerContainer} from './index';
+import {BrowserAnimationsModule, NoopAnimationsModule} from '@angular/platform-browser/animations';
+import {MatDrawer, MatSidenavModule, MatDrawerContainer} from './index';
+import {Direction} from '@angular/cdk/bidi';
 import {A11yModule} from '@angular/cdk/a11y';
 import {PlatformModule} from '@angular/cdk/platform';
 import {ESCAPE} from '@angular/cdk/keycodes';
 import {dispatchKeyboardEvent} from '@angular/cdk/testing';
 
 
-describe('MdDrawer', () => {
+describe('MatDrawer', () => {
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdSidenavModule, A11yModule, PlatformModule, NoopAnimationsModule],
+      imports: [MatSidenavModule, A11yModule, PlatformModule, NoopAnimationsModule],
       declarations: [
         BasicTestApp,
         DrawerContainerNoDrawerTestApp,
         DrawerSetToOpenedFalse,
         DrawerSetToOpenedTrue,
         DrawerDynamicPosition,
-        DrawerWitFocusableElements,
+        DrawerWithFocusableElements,
+        DrawerOpenBinding,
+        DrawerWithoutFocusableElements,
       ],
     });
 
@@ -27,15 +38,95 @@ describe('MdDrawer', () => {
   }));
 
   describe('methods', () => {
-    it('should be able to open and close', fakeAsync(() => {
-      let fixture = TestBed.createComponent(BasicTestApp);
+    it('should be able to open', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
 
       fixture.detectChanges();
 
-      let testComponent: BasicTestApp = fixture.debugElement.componentInstance;
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer));
-      let drawerBackdropElement = fixture.debugElement.query(By.css('.mat-drawer-backdrop'));
+      const testComponent: BasicTestApp = fixture.debugElement.componentInstance;
+      const drawer = fixture.debugElement.query(By.directive(MatDrawer));
+      const drawerBackdropElement = fixture.debugElement.query(By.css('.mat-drawer-backdrop'));
 
+      drawerBackdropElement.nativeElement.style.transition = 'none';
+      fixture.debugElement.query(By.css('.open')).nativeElement.click();
+      fixture.detectChanges();
+
+      expect(testComponent.openCount).toBe(0);
+      expect(testComponent.openStartCount).toBe(0);
+
+      tick();
+      expect(testComponent.openStartCount).toBe(1);
+      fixture.detectChanges();
+
+      expect(testComponent.openCount).toBe(1);
+      expect(testComponent.openStartCount).toBe(1);
+      expect(getComputedStyle(drawer.nativeElement).visibility).toBe('visible');
+      expect(getComputedStyle(drawerBackdropElement.nativeElement).visibility).toBe('visible');
+    }));
+
+    it('should be able to close', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+
+      fixture.detectChanges();
+
+      const testComponent: BasicTestApp = fixture.debugElement.componentInstance;
+      const drawer = fixture.debugElement.query(By.directive(MatDrawer));
+      const drawerBackdropElement = fixture.debugElement.query(By.css('.mat-drawer-backdrop'));
+
+      drawerBackdropElement.nativeElement.style.transition = 'none';
+      fixture.debugElement.query(By.css('.open')).nativeElement.click();
+      fixture.detectChanges();
+      flush();
+      fixture.detectChanges();
+
+      fixture.debugElement.query(By.css('.close')).nativeElement.click();
+      fixture.detectChanges();
+
+      expect(testComponent.closeCount).toBe(0);
+      expect(testComponent.closeStartCount).toBe(0);
+
+      flush();
+      expect(testComponent.closeStartCount).toBe(1);
+      fixture.detectChanges();
+
+      expect(testComponent.closeCount).toBe(1);
+      expect(testComponent.closeStartCount).toBe(1);
+      expect(getComputedStyle(drawer.nativeElement).visibility).toBe('hidden');
+      expect(getComputedStyle(drawerBackdropElement.nativeElement).visibility).toBe('hidden');
+    }));
+
+    it('should resolve the open method promise with the new state of the drawer', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+      fixture.detectChanges();
+      const drawer = fixture.debugElement.query(By.directive(MatDrawer));
+
+      drawer.componentInstance.open().then(result => expect(result).toBe('open'));
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+    }));
+
+    it('should resolve the close method promise with the new state of the drawer', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+      fixture.detectChanges();
+      const drawer = fixture.debugElement.query(By.directive(MatDrawer));
+
+      drawer.componentInstance.open();
+      fixture.detectChanges();
+      flush();
+      fixture.detectChanges();
+
+      drawer.componentInstance.close().then(result => expect(result).toBe('close'));
+      fixture.detectChanges();
+      flush();
+      fixture.detectChanges();
+    }));
+
+    it('should be able to close while the open animation is running', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+      fixture.detectChanges();
+
+      const testComponent: BasicTestApp = fixture.debugElement.componentInstance;
       fixture.debugElement.query(By.css('.open')).nativeElement.click();
       fixture.detectChanges();
 
@@ -43,27 +134,14 @@ describe('MdDrawer', () => {
       expect(testComponent.closeCount).toBe(0);
 
       tick();
-      fixture.detectChanges();
-
-      expect(drawer.componentInstance._isAnimating).toBe(false);
-      expect(testComponent.openCount).toBe(1);
-      expect(testComponent.closeCount).toBe(0);
-      expect(getComputedStyle(drawer.nativeElement).visibility).toBe('visible');
-      expect(getComputedStyle(drawerBackdropElement.nativeElement).visibility).toBe('visible');
-
       fixture.debugElement.query(By.css('.close')).nativeElement.click();
       fixture.detectChanges();
 
-      expect(testComponent.openCount).toBe(1);
-      expect(testComponent.closeCount).toBe(0);
-
-      tick();
+      flush();
       fixture.detectChanges();
 
       expect(testComponent.openCount).toBe(1);
       expect(testComponent.closeCount).toBe(1);
-      expect(getComputedStyle(drawer.nativeElement).visibility).toBe('hidden');
-      expect(getComputedStyle(drawerBackdropElement.nativeElement).visibility).toBe('hidden');
     }));
 
     it('does not throw when created without a drawer', fakeAsync(() => {
@@ -76,28 +154,30 @@ describe('MdDrawer', () => {
 
     it('should emit the backdropClick event when the backdrop is clicked', fakeAsync(() => {
       let fixture = TestBed.createComponent(BasicTestApp);
+      fixture.detectChanges();
+
       let testComponent: BasicTestApp = fixture.debugElement.componentInstance;
       let openButtonElement = fixture.debugElement.query(By.css('.open')).nativeElement;
 
       openButtonElement.click();
       fixture.detectChanges();
-      tick();
+      flush();
 
       expect(testComponent.backdropClickedCount).toBe(0);
 
       fixture.debugElement.query(By.css('.mat-drawer-backdrop')).nativeElement.click();
       fixture.detectChanges();
-      tick();
+      flush();
 
       expect(testComponent.backdropClickedCount).toBe(1);
 
       openButtonElement.click();
       fixture.detectChanges();
-      tick();
+      flush();
 
       fixture.debugElement.query(By.css('.close')).nativeElement.click();
       fixture.detectChanges();
-      tick();
+      flush();
 
       expect(testComponent.backdropClickedCount).toBe(1);
     }));
@@ -108,26 +188,38 @@ describe('MdDrawer', () => {
       fixture.detectChanges();
 
       let testComponent: BasicTestApp = fixture.debugElement.componentInstance;
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer));
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer));
 
       drawer.componentInstance.open();
       fixture.detectChanges();
       tick();
 
       expect(testComponent.openCount).toBe(1, 'Expected one open event.');
+      expect(testComponent.openStartCount).toBe(1, 'Expected one open start event.');
       expect(testComponent.closeCount).toBe(0, 'Expected no close events.');
+      expect(testComponent.closeStartCount).toBe(0, 'Expected no close start events.');
 
       dispatchKeyboardEvent(drawer.nativeElement, 'keydown', ESCAPE);
       fixture.detectChanges();
-      tick();
+      flush();
 
       expect(testComponent.closeCount).toBe(1, 'Expected one close event.');
+      expect(testComponent.closeStartCount).toBe(1, 'Expected one close start event.');
+    }));
+
+    it('should fire the open event when open on init', fakeAsync(() => {
+      let fixture = TestBed.createComponent(DrawerSetToOpenedTrue);
+
+      fixture.detectChanges();
+      tick();
+
+      expect(fixture.componentInstance.openCallback).toHaveBeenCalledTimes(1);
     }));
 
     it('should not close by pressing escape when disableClose is set', fakeAsync(() => {
       let fixture = TestBed.createComponent(BasicTestApp);
       let testComponent = fixture.debugElement.componentInstance;
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer));
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer));
 
       drawer.componentInstance.disableClose = true;
       drawer.componentInstance.open();
@@ -139,12 +231,13 @@ describe('MdDrawer', () => {
       tick();
 
       expect(testComponent.closeCount).toBe(0);
+      expect(testComponent.closeStartCount).toBe(0);
     }));
 
     it('should not close by clicking on the backdrop when disableClose is set', fakeAsync(() => {
       let fixture = TestBed.createComponent(BasicTestApp);
       let testComponent = fixture.debugElement.componentInstance;
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer)).componentInstance;
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer)).componentInstance;
 
       drawer.disableClose = true;
       drawer.open();
@@ -156,6 +249,7 @@ describe('MdDrawer', () => {
       tick();
 
       expect(testComponent.closeCount).toBe(0);
+      expect(testComponent.closeStartCount).toBe(0);
     }));
 
     it('should restore focus on close if focus is inside drawer', fakeAsync(() => {
@@ -163,19 +257,19 @@ describe('MdDrawer', () => {
 
       fixture.detectChanges();
 
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer)).componentInstance;
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer)).componentInstance;
       let openButton = fixture.componentInstance.openButton.nativeElement;
       let drawerButton = fixture.componentInstance.drawerButton.nativeElement;
 
       openButton.focus();
       drawer.open();
       fixture.detectChanges();
-      tick();
+      flush();
       drawerButton.focus();
 
       drawer.close();
       fixture.detectChanges();
-      tick();
+      flush();
 
       expect(document.activeElement)
           .toBe(openButton, 'Expected focus to be restored to the open button on close.');
@@ -183,8 +277,8 @@ describe('MdDrawer', () => {
 
     it('should not restore focus on close if focus is outside drawer', fakeAsync(() => {
       let fixture = TestBed.createComponent(BasicTestApp);
-      let drawer: MdDrawer = fixture.debugElement
-          .query(By.directive(MdDrawer)).componentInstance;
+      let drawer: MatDrawer = fixture.debugElement
+          .query(By.directive(MatDrawer)).componentInstance;
       let openButton = fixture.componentInstance.openButton.nativeElement;
       let closeButton = fixture.componentInstance.closeButton.nativeElement;
 
@@ -210,9 +304,9 @@ describe('MdDrawer', () => {
 
       fixture.detectChanges();
 
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer)).componentInstance;
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer)).componentInstance;
 
-      expect((drawer as MdDrawer).opened).toBe(false);
+      expect((drawer as MatDrawer).opened).toBe(false);
     });
 
     it('should correctly parse opened="true"', () => {
@@ -220,16 +314,16 @@ describe('MdDrawer', () => {
 
       fixture.detectChanges();
 
-      let drawer = fixture.debugElement.query(By.directive(MdDrawer)).componentInstance;
+      let drawer = fixture.debugElement.query(By.directive(MatDrawer)).componentInstance;
 
-      expect((drawer as MdDrawer).opened).toBe(true);
+      expect((drawer as MatDrawer).opened).toBe(true);
     });
 
     it('should remove align attr from DOM', () => {
       const fixture = TestBed.createComponent(BasicTestApp);
       fixture.detectChanges();
 
-      const drawerEl = fixture.debugElement.query(By.css('md-drawer')).nativeElement;
+      const drawerEl = fixture.debugElement.query(By.css('mat-drawer')).nativeElement;
       expect(drawerEl.hasAttribute('align'))
           .toBe(false, 'Expected drawer not to have a native align attribute.');
     });
@@ -242,7 +336,14 @@ describe('MdDrawer', () => {
       const testComponent: DrawerDynamicPosition = fixture.debugElement.componentInstance;
       testComponent.drawer1Position = 'end';
 
-      expect(() => fixture.detectChanges()).toThrow();
+      expect(() => {
+        try {
+          fixture.detectChanges();
+          tick(0);
+        } catch {
+          tick(0);
+        }
+      }).toThrow();
     }));
 
     it('should not throw when drawers swap positions', () => {
@@ -255,26 +356,73 @@ describe('MdDrawer', () => {
 
       expect(() => fixture.detectChanges()).not.toThrow();
     });
+
+    it('should bind 2-way bind on opened property', fakeAsync(() => {
+      const fixture = TestBed.createComponent(DrawerOpenBinding);
+      fixture.detectChanges();
+
+      let drawer: MatDrawer = fixture.debugElement
+          .query(By.directive(MatDrawer)).componentInstance;
+
+      drawer.open();
+      fixture.detectChanges();
+      tick();
+
+      expect(fixture.componentInstance.isOpen).toBe(true);
+    }));
+
+    it('should not throw when a two-way binding is toggled quickly while animating',
+      fakeAsync(() => {
+        TestBed
+          .resetTestingModule()
+          .configureTestingModule({
+            imports: [MatSidenavModule, BrowserAnimationsModule],
+            declarations: [DrawerOpenBinding],
+          })
+          .compileComponents();
+
+        const fixture = TestBed.createComponent(DrawerOpenBinding);
+        fixture.detectChanges();
+
+        // Note that we need actual timeouts and the `BrowserAnimationsModule`
+        // in order to test it correctly.
+        setTimeout(() => {
+          fixture.componentInstance.isOpen = !fixture.componentInstance.isOpen;
+          expect(() => fixture.detectChanges()).not.toThrow();
+
+          setTimeout(() => {
+            fixture.componentInstance.isOpen = !fixture.componentInstance.isOpen;
+            expect(() => fixture.detectChanges()).not.toThrow();
+          }, 1);
+
+          tick(1);
+        }, 1);
+
+        tick(1);
+      }));
+
   });
 
   describe('focus trapping behavior', () => {
-    let fixture: ComponentFixture<DrawerWitFocusableElements>;
-    let testComponent: DrawerWitFocusableElements;
-    let drawer: MdDrawer;
+    let fixture: ComponentFixture<DrawerWithFocusableElements>;
+    let testComponent: DrawerWithFocusableElements;
+    let drawer: MatDrawer;
     let firstFocusableElement: HTMLElement;
     let lastFocusableElement: HTMLElement;
 
     beforeEach(() => {
-      fixture = TestBed.createComponent(DrawerWitFocusableElements);
+      fixture = TestBed.createComponent(DrawerWithFocusableElements);
+      fixture.detectChanges();
       testComponent = fixture.debugElement.componentInstance;
-      drawer = fixture.debugElement.query(By.directive(MdDrawer)).componentInstance;
-      firstFocusableElement = fixture.debugElement.query(By.css('.link1')).nativeElement;
-      lastFocusableElement = fixture.debugElement.query(By.css('.link1')).nativeElement;
+      drawer = fixture.debugElement.query(By.directive(MatDrawer)).componentInstance;
+      firstFocusableElement = fixture.debugElement.query(By.css('.input1')).nativeElement;
+      lastFocusableElement = fixture.debugElement.query(By.css('.input2')).nativeElement;
       lastFocusableElement.focus();
     });
 
     it('should trap focus when opened in "over" mode', fakeAsync(() => {
       testComponent.mode = 'over';
+      fixture.detectChanges();
       lastFocusableElement.focus();
 
       drawer.open();
@@ -286,6 +434,7 @@ describe('MdDrawer', () => {
 
     it('should trap focus when opened in "push" mode', fakeAsync(() => {
       testComponent.mode = 'push';
+      fixture.detectChanges();
       lastFocusableElement.focus();
 
       drawer.open();
@@ -297,6 +446,7 @@ describe('MdDrawer', () => {
 
     it('should not trap focus when opened in "side" mode', fakeAsync(() => {
       testComponent.mode = 'side';
+      fixture.detectChanges();
       lastFocusableElement.focus();
 
       drawer.open();
@@ -305,14 +455,49 @@ describe('MdDrawer', () => {
 
       expect(document.activeElement).toBe(lastFocusableElement);
     }));
+
+    it('should focus the drawer if there are no focusable elements', fakeAsync(() => {
+      fixture.destroy();
+
+      const nonFocusableFixture = TestBed.createComponent(DrawerWithoutFocusableElements);
+      const drawerEl = nonFocusableFixture.debugElement.query(By.directive(MatDrawer));
+      nonFocusableFixture.detectChanges();
+
+      drawerEl.componentInstance.open();
+      nonFocusableFixture.detectChanges();
+      tick();
+
+      expect(document.activeElement).toBe(drawerEl.nativeElement);
+    }));
+
+    it('should be able to disable auto focus', fakeAsync(() => {
+      testComponent.autoFocus = false;
+      testComponent.mode = 'push';
+      fixture.detectChanges();
+      lastFocusableElement.focus();
+
+      drawer.open();
+      fixture.detectChanges();
+      tick();
+
+      expect(document.activeElement).not.toBe(firstFocusableElement);
+    }));
+
   });
 });
 
-describe('MdDrawerContainer', () => {
+describe('MatDrawerContainer', () => {
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdSidenavModule, A11yModule, PlatformModule, NoopAnimationsModule],
-      declarations: [DrawerContainerTwoDrawerTestApp, DrawerDelayed],
+      imports: [MatSidenavModule, A11yModule, PlatformModule, NoopAnimationsModule],
+      declarations: [
+        DrawerContainerTwoDrawerTestApp,
+        DrawerDelayed,
+        DrawerSetToOpenedTrue,
+        DrawerContainerStateChangesTestApp,
+        AutosizeDrawer,
+        BasicTestApp,
+      ],
     });
 
     TestBed.compileComponents();
@@ -325,7 +510,7 @@ describe('MdDrawerContainer', () => {
 
     const testComponent: DrawerContainerTwoDrawerTestApp =
       fixture.debugElement.componentInstance;
-    const drawers = fixture.debugElement.queryAll(By.directive(MdDrawer));
+    const drawers = fixture.debugElement.queryAll(By.directive(MatDrawer));
 
     expect(drawers.every(drawer => drawer.componentInstance.opened)).toBe(false);
 
@@ -337,7 +522,7 @@ describe('MdDrawerContainer', () => {
 
     testComponent.drawerContainer.close();
     fixture.detectChanges();
-    tick();
+    flush();
 
     expect(drawers.every(drawer => drawer.componentInstance.opened)).toBe(false);
   }));
@@ -361,43 +546,222 @@ describe('MdDrawerContainer', () => {
 
     expect(parseInt(contentElement.style.marginLeft)).toBeGreaterThan(0);
   }));
+
+  it('should recalculate the margin if a drawer is destroyed', fakeAsync(() => {
+    const fixture = TestBed.createComponent(DrawerContainerStateChangesTestApp);
+
+    fixture.detectChanges();
+    fixture.componentInstance.drawer.open();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const contentElement = fixture.debugElement.nativeElement.querySelector('.mat-drawer-content');
+    const initialMargin = parseInt(contentElement.style.marginLeft);
+
+    expect(initialMargin).toBeGreaterThan(0);
+
+    fixture.componentInstance.renderDrawer = false;
+    fixture.detectChanges();
+    tick();
+
+    expect(contentElement.style.marginLeft).toBe('');
+  }));
+
+  it('should recalculate the margin if the drawer mode is changed', fakeAsync(() => {
+    const fixture = TestBed.createComponent(DrawerContainerStateChangesTestApp);
+
+    fixture.detectChanges();
+    fixture.componentInstance.drawer.open();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const contentElement = fixture.debugElement.nativeElement.querySelector('.mat-drawer-content');
+    const initialMargin = parseInt(contentElement.style.marginLeft);
+
+    expect(initialMargin).toBeGreaterThan(0);
+
+    fixture.componentInstance.mode = 'over';
+    fixture.detectChanges();
+
+    expect(contentElement.style.marginLeft).toBe('');
+  }));
+
+  it('should recalculate the margin if the direction has changed', fakeAsync(() => {
+    const fixture = TestBed.createComponent(DrawerContainerStateChangesTestApp);
+
+    fixture.detectChanges();
+    fixture.componentInstance.drawer.open();
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const contentElement = fixture.debugElement.nativeElement.querySelector('.mat-drawer-content');
+    const margin = parseInt(contentElement.style.marginLeft);
+
+    expect(margin).toBeGreaterThan(0);
+
+    fixture.componentInstance.direction = 'rtl';
+    fixture.detectChanges();
+
+    expect(contentElement.style.marginLeft).toBe('');
+    expect(parseInt(contentElement.style.marginRight)).toBe(margin);
+  }));
+
+  it('should not animate when the sidenav is open on load ', fakeAsync(() => {
+    TestBed
+      .resetTestingModule()
+      .configureTestingModule({
+        imports: [MatSidenavModule, BrowserAnimationsModule],
+        declarations: [DrawerSetToOpenedTrue],
+      })
+      .compileComponents();
+
+    const fixture = TestBed.createComponent(DrawerSetToOpenedTrue);
+
+    fixture.detectChanges();
+    tick();
+
+    const container = fixture.debugElement.nativeElement.querySelector('.mat-drawer-container');
+
+    expect(container.classList).not.toContain('mat-drawer-transition');
+  }));
+
+  it('should recalculate the margin if a drawer changes size while open in autosize mode',
+    fakeAsync(() => {
+      const fixture = TestBed.createComponent(AutosizeDrawer);
+
+      fixture.detectChanges();
+      fixture.componentInstance.drawer.open();
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const contentEl = fixture.debugElement.nativeElement.querySelector('.mat-drawer-content');
+      const initialMargin = parseInt(contentEl.style.marginLeft);
+
+      expect(initialMargin).toBeGreaterThan(0);
+
+      fixture.componentInstance.fillerWidth = 200;
+      fixture.detectChanges();
+      tick(10);
+      fixture.detectChanges();
+
+      expect(parseInt(contentEl.style.marginLeft)).toBeGreaterThan(initialMargin);
+      discardPeriodicTasks();
+    }));
+
+  it('should not set a style property if it would be zero', fakeAsync(() => {
+      const fixture = TestBed.createComponent(AutosizeDrawer);
+      fixture.detectChanges();
+
+      const content = fixture.debugElement.nativeElement.querySelector('.mat-drawer-content');
+      expect(content.style.marginLeft).toBe('', 'Margin should be omitted when drawer is closed');
+
+      // Open the drawer and resolve the open animation.
+      fixture.componentInstance.drawer.open();
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(content.style.marginLeft).not.toBe('', 'Margin should be present when drawer is open');
+
+      // Close the drawer and resolve the close animation.
+      fixture.componentInstance.drawer.close();
+      fixture.detectChanges();
+      flush();
+      fixture.detectChanges();
+
+      expect(content.style.marginLeft).toBe('', 'Margin should be removed after drawer close.');
+
+      discardPeriodicTasks();
+    }));
+
+    it('should be able to toggle whether the container has a backdrop', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.mat-drawer-backdrop')).toBeTruthy();
+
+      fixture.componentInstance.hasBackdrop = false;
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.mat-drawer-backdrop')).toBeFalsy();
+    }));
+
+    it('should be able to explicitly enable the backdrop in `side` mode', fakeAsync(() => {
+      const fixture = TestBed.createComponent(BasicTestApp);
+      const root = fixture.nativeElement;
+
+      fixture.componentInstance.drawer.mode = 'side';
+      fixture.detectChanges();
+      fixture.componentInstance.drawer.open();
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      let backdrop = root.querySelector('.mat-drawer-backdrop.mat-drawer-shown');
+
+      expect(backdrop).toBeFalsy();
+
+      fixture.componentInstance.hasBackdrop = true;
+      fixture.detectChanges();
+      backdrop = root.querySelector('.mat-drawer-backdrop.mat-drawer-shown');
+
+      expect(backdrop).toBeTruthy();
+      expect(fixture.componentInstance.drawer.opened).toBe(true);
+
+      backdrop.click();
+      fixture.detectChanges();
+      tick();
+
+      expect(fixture.componentInstance.drawer.opened).toBe(false);
+    }));
+
 });
 
 
-/** Test component that contains an MdDrawerContainer but no MdDrawer. */
-@Component({template: `<md-drawer-container></md-drawer-container>`})
+/** Test component that contains an MatDrawerContainer but no MatDrawer. */
+@Component({template: `<mat-drawer-container></mat-drawer-container>`})
 class DrawerContainerNoDrawerTestApp { }
 
-/** Test component that contains an MdDrawerContainer and 2 MdDrawer in the same position. */
+/** Test component that contains an MatDrawerContainer and 2 MatDrawer in the same position. */
 @Component({
   template: `
-    <md-drawer-container>
-      <md-drawer position="start"></md-drawer>
-      <md-drawer position="end"></md-drawer>
-    </md-drawer-container>`,
+    <mat-drawer-container>
+      <mat-drawer position="start"></mat-drawer>
+      <mat-drawer position="end"></mat-drawer>
+    </mat-drawer-container>`,
 })
 class DrawerContainerTwoDrawerTestApp {
-  @ViewChild(MdDrawerContainer) drawerContainer: MdDrawerContainer;
+  @ViewChild(MatDrawerContainer) drawerContainer: MatDrawerContainer;
 }
 
-/** Test component that contains an MdDrawerContainer and one MdDrawer. */
+/** Test component that contains an MatDrawerContainer and one MatDrawer. */
 @Component({
   template: `
-    <md-drawer-container (backdropClick)="backdropClicked()">
-      <md-drawer #drawer position="start"
-                 (open)="open()"
-                 (close)="close()">
-        <button #drawerButton>Content.</button>
-      </md-drawer>
+    <mat-drawer-container (backdropClick)="backdropClicked()" [hasBackdrop]="hasBackdrop">
+      <mat-drawer #drawer="matDrawer" position="start"
+                 (opened)="open()"
+                 (openedStart)="openStart()"
+                 (closed)="close()"
+                 (closedStart)="closeStart()">
+        <button #drawerButton>Content</button>
+      </mat-drawer>
       <button (click)="drawer.open()" class="open" #openButton></button>
       <button (click)="drawer.close()" class="close" #closeButton></button>
-    </md-drawer-container>`,
+    </mat-drawer-container>`,
 })
 class BasicTestApp {
-  openCount: number = 0;
-  closeCount: number = 0;
-  backdropClickedCount: number = 0;
+  openCount = 0;
+  openStartCount = 0;
+  closeCount = 0;
+  closeStartCount = 0;
+  backdropClickedCount = 0;
+  hasBackdrop: boolean | null = null;
 
+  @ViewChild('drawer') drawer: MatDrawer;
   @ViewChild('drawerButton') drawerButton: ElementRef;
   @ViewChild('openButton') openButton: ElementRef;
   @ViewChild('closeButton') closeButton: ElementRef;
@@ -406,8 +770,16 @@ class BasicTestApp {
     this.openCount++;
   }
 
+  openStart() {
+    this.openStartCount++;
+  }
+
   close() {
     this.closeCount++;
+  }
+
+  closeStart() {
+    this.closeStartCount++;
   }
 
   backdropClicked() {
@@ -417,30 +789,44 @@ class BasicTestApp {
 
 @Component({
   template: `
-    <md-drawer-container>
-      <md-drawer #drawer mode="side" opened="false">
+    <mat-drawer-container>
+      <mat-drawer #drawer mode="side" opened="false">
         Closed Drawer.
-      </md-drawer>
-    </md-drawer-container>`,
+      </mat-drawer>
+    </mat-drawer-container>`,
 })
 class DrawerSetToOpenedFalse { }
 
 @Component({
   template: `
-    <md-drawer-container>
-      <md-drawer #drawer mode="side" opened="true">
+    <mat-drawer-container>
+      <mat-drawer #drawer mode="side" opened="true" (opened)="openCallback()">
         Closed Drawer.
-      </md-drawer>
-    </md-drawer-container>`,
+      </mat-drawer>
+    </mat-drawer-container>`,
 })
-class DrawerSetToOpenedTrue { }
+class DrawerSetToOpenedTrue {
+  openCallback = jasmine.createSpy('open callback');
+}
 
 @Component({
   template: `
-    <md-drawer-container>
-      <md-drawer #drawer1 [position]="drawer1Position"></md-drawer>
-      <md-drawer #drawer2 [position]="drawer2Position"></md-drawer>
-    </md-drawer-container>`,
+    <mat-drawer-container>
+      <mat-drawer #drawer mode="side" [(opened)]="isOpen">
+        Closed Drawer.
+      </mat-drawer>
+    </mat-drawer-container>`,
+})
+class DrawerOpenBinding {
+  isOpen = false;
+}
+
+@Component({
+  template: `
+    <mat-drawer-container>
+      <mat-drawer #drawer1 [position]="drawer1Position"></mat-drawer>
+      <mat-drawer #drawer2 [position]="drawer2Position"></mat-drawer>
+    </mat-drawer-container>`,
 })
 class DrawerDynamicPosition {
   drawer1Position = 'start';
@@ -448,27 +834,70 @@ class DrawerDynamicPosition {
 }
 
 @Component({
+  // Note: we use inputs here, because they're guaranteed
+  // to be focusable across all platforms.
   template: `
-    <md-drawer-container>
-      <md-drawer position="start" [mode]="mode">
-        <a class="link1" href="#">link1</a>
-      </md-drawer>
-      <a class="link2" href="#">link2</a>
-    </md-drawer-container>`,
+    <mat-drawer-container>
+      <mat-drawer position="start" [mode]="mode" [autoFocus]="autoFocus">
+        <input type="text" class="input1"/>
+      </mat-drawer>
+      <input type="text" class="input2"/>
+    </mat-drawer-container>`,
 })
-class DrawerWitFocusableElements {
+class DrawerWithFocusableElements {
   mode: string = 'over';
+  autoFocus = true;
+}
+
+@Component({
+  template: `
+    <mat-drawer-container>
+      <mat-drawer position="start" mode="over">
+        <button disabled>Not focusable</button>
+      </mat-drawer>
+    </mat-drawer-container>`,
+})
+class DrawerWithoutFocusableElements {}
+
+@Component({
+  template: `
+    <mat-drawer-container>
+      <mat-drawer *ngIf="showDrawer" #drawer mode="side">Drawer</mat-drawer>
+    </mat-drawer-container>
+  `,
+})
+class DrawerDelayed {
+  @ViewChild(MatDrawer) drawer: MatDrawer;
+  showDrawer = false;
 }
 
 
 @Component({
   template: `
-    <md-drawer-container>
-      <md-drawer *ngIf="showDrawer" #drawer mode="side">Drawer</md-drawer>
-    </md-drawer-container>
-  `,
+    <mat-drawer-container [dir]="direction">
+      <mat-drawer *ngIf="renderDrawer" [mode]="mode" style="width:100px"></mat-drawer>
+    </mat-drawer-container>`,
 })
-class DrawerDelayed {
-  @ViewChild(MdDrawer) drawer: MdDrawer;
-  showDrawer = false;
+class DrawerContainerStateChangesTestApp {
+  @ViewChild(MatDrawer) drawer: MatDrawer;
+  @ViewChild(MatDrawerContainer) drawerContainer: MatDrawerContainer;
+
+  direction: Direction = 'ltr';
+  mode = 'side';
+  renderDrawer = true;
+}
+
+
+@Component({
+  template: `
+    <mat-drawer-container autosize>
+      <mat-drawer mode="push" [position]="drawer1Position">
+        Text
+        <div [style.width.px]="fillerWidth"></div>
+      </mat-drawer>
+    </mat-drawer-container>`,
+})
+class AutosizeDrawer {
+  @ViewChild(MatDrawer) drawer: MatDrawer;
+  fillerWidth = 0;
 }

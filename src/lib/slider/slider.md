@@ -1,4 +1,4 @@
-`<md-slider>` allows for the selection of a value from a range via mouse, touch, or keyboard, 
+`<mat-slider>` allows for the selection of a value from a range via mouse, touch, or keyboard,
 similar to `<input type="range">`.
 
 <!-- example(slider-overview) -->
@@ -12,7 +12,7 @@ in increments of `1`. These values can be changed by setting the `min`, `max`, a
 respectively. The initial value is set to the minimum value unless otherwise specified.
 
 ```html
-<md-slider min="1" max="5" step="0.5" value="1.5"></md-slider>
+<mat-slider min="1" max="5" step="0.5" value="1.5"></mat-slider>
 ```
 
 ### Orientation
@@ -22,16 +22,16 @@ right. The `vertical` attribute can be added to a slider to make it vertical wit
 on bottom and the maximum value on top.
 
 ```html
-<md-slider vertical></md-slider>
+<mat-slider vertical></mat-slider>
 ```
 
 An `invert` attribute is also available which can be specified to flip the axis that the thumb moves
 along. An inverted horizontal slider will have the minimum value on the right and the maximum value
-on the left, while an inverted vertical slider will have the minimum value on top and the  maximum
+on the left, while an inverted vertical slider will have the minimum value on top and the maximum
 value on bottom.
 
 ```html
-<md-slider invert></md-slider>
+<mat-slider invert></mat-slider>
 ```
 
 ### Thumb label
@@ -43,8 +43,15 @@ The [Material Design spec](https://material.google.com/components/sliders.html) 
 discrete value (such as a 1-5 rating).
 
 ```html
-<md-slider thumbLabel tickInterval="1"></md-slider>
+<mat-slider thumbLabel tickInterval="1"></mat-slider>
 ```
+
+### Formatting the thumb label
+By default, the value in the slider's thumb label will be the same as the model value, however this
+may end up being too large to fit into the label. If you want to control the value that is being
+displayed, you can do so using the `displayWith` input.
+
+<!-- example(slider-formatting) -->
 
 ### Tick marks
 By default, sliders do not show tick marks along the thumb track. This can be enabled using the
@@ -53,14 +60,14 @@ of steps between between ticks. For example a `tickInterval` of `3` with a `step
 tick marks at every `3` steps, which is the same as every `12` values.
 
 ```html
-<md-slider step="4" tickInterval="3"></md-slider>
+<mat-slider step="4" tickInterval="3"></mat-slider>
 ```
 
 The `tickInterval` can also be set to `auto` which will automatically choose the number of steps
 such that there is at least `30px` of space between ticks.
 
 ```html
-<md-slider tickInterval="auto"></md-slider>
+<mat-slider tickInterval="auto"></mat-slider>
 ```
 
 The slider will always show a tick at the beginning and end of the track. If the remaining space

@@ -1,52 +1,50 @@
-<div
-  cdk-overlay-origin
-  class="mat-select-trigger"
-  aria-hidden="true"
-  (click)="toggle()"
-  #origin="cdkOverlayOrigin"
-  #trigger>
-  <span
-    class="mat-select-placeholder"
-    [class.mat-floating-placeholder]="_hasValue()"
-    [@transformPlaceholder]="_getPlaceholderAnimationState()"
-    [style.opacity]="_getPlaceholderOpacity()"
-    [style.width.px]="_selectedValueWidth">{{ placeholder }}</span>
-
-  <span class="mat-select-value" *ngIf="_hasValue()">
-    <span class="mat-select-value-text" [ngSwitch]="!!customTrigger">
-      <span *ngSwitchDefault>{{ triggerValue }}</span>
-      <ng-content select="md-select-trigger, mat-select-trigger" *ngSwitchCase="true"></ng-content>
+<div cdk-overlay-origin
+     class="mat-select-trigger"
+     aria-hidden="true"
+     (click)="toggle()"
+     #origin="cdkOverlayOrigin"
+     #trigger>
+  <div class="mat-select-value" [ngSwitch]="empty">
+    <span class="mat-select-placeholder" *ngSwitchCase="true">{{placeholder || '\u00A0'}}</span>
+    <span class="mat-select-value-text" *ngSwitchCase="false" [ngSwitch]="!!customTrigger">
+      <span *ngSwitchDefault>{{triggerValue || '\u00A0'}}</span>
+      <ng-content select="mat-select-trigger" *ngSwitchCase="true"></ng-content>
     </span>
-  </span>
+  </div>
 
-  <span class="mat-select-arrow"></span>
-  <span class="mat-select-underline"></span>
+  <div class="mat-select-arrow-wrapper"><div class="mat-select-arrow"></div></div>
 </div>
 
 <ng-template
   cdk-connected-overlay
-  hasBackdrop
-  backdropClass="cdk-overlay-transparent-backdrop"
-  [scrollStrategy]="_scrollStrategy"
-  [origin]="origin"
-  [open]="panelOpen"
-  [positions]="_positions"
-  [minWidth]="_triggerWidth"
-  [offsetY]="_offsetY"
+  cdkConnectedOverlayLockPosition
+  cdkConnectedOverlayHasBackdrop
+  cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+  [cdkConnectedOverlayScrollStrategy]="_scrollStrategy"
+  [cdkConnectedOverlayOrigin]="origin"
+  [cdkConnectedOverlayOpen]="panelOpen"
+  [cdkConnectedOverlayPositions]="_positions"
+  [cdkConnectedOverlayMinWidth]="_triggerRect?.width"
+  [cdkConnectedOverlayOffsetY]="_offsetY"
   (backdropClick)="close()"
   (attach)="_onAttached()"
   (detach)="close()">
 
   <div
-    class="mat-select-panel {{ 'mat-' + color }}"
+    #panel
+    class="mat-select-panel {{ _getPanelTheme() }}"
     [ngClass]="panelClass"
     [@transformPanel]="multiple ? 'showing-multiple' : 'showing'"
-    (@transformPanel.done)="_onPanelDone()"
-    (keydown)="_handlePanelKeydown($event)"
+    (@transformPanel.done)="_panelDoneAnimatingStream.next($event.toState)"
     [style.transformOrigin]="_transformOrigin"
-    [class.mat-select-panel-done-animating]="_panelDoneAnimating">
+    [class.mat-select-panel-done-animating]="_panelDoneAnimating"
+    [style.font-size.px]="_triggerFontSize"
+    (keydown)="_handleKeydown($event)">
 
-    <div class="mat-select-content" [@fadeInContent]="'showing'" (@fadeInContent.done)="_onFadeInDone()">
+    <div
+      class="mat-select-content"
+      [@fadeInContent]="'showing'"
+      (@fadeInContent.done)="_onFadeInDone()">
       <ng-content></ng-content>
     </div>
   </div>

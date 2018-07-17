@@ -1,3 +1,5 @@
+@import '../core/style/layout-common';
+
 $mat-stepper-label-header-height: 24px !default;
 $mat-stepper-label-min-width: 50px !default;
 $mat-stepper-side-gap: 24px !default;
@@ -5,6 +7,15 @@ $mat-vertical-stepper-content-margin: 36px !default;
 $mat-stepper-line-gap: 8px !default;
 $mat-step-optional-font-size: 12px;
 $mat-step-header-icon-size: 16px !default;
+
+.mat-step-header {
+  overflow: hidden;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  box-sizing: content-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
 .mat-step-optional {
   font-size: $mat-step-optional-font-size;
@@ -18,6 +29,7 @@ $mat-step-header-icon-size: 16px !default;
   align-items: center;
   justify-content: center;
   display: flex;
+  flex-shrink: 0;
 }
 
 .mat-step-icon .mat-icon {
@@ -38,4 +50,9 @@ $mat-step-header-icon-size: 16px !default;
 .mat-step-text-label {
   text-overflow: ellipsis;
   overflow: hidden;
+}
+
+.mat-step-header-ripple {
+  @include mat-fill;
+  pointer-events: none;
 }

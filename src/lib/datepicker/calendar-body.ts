@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -9,18 +9,20 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
   Output,
-  ViewEncapsulation
+  ViewEncapsulation,
+  NgZone,
 } from '@angular/core';
-
+import {take} from 'rxjs/operators';
 
 /**
  * An internal class that represents the data corresponding to a single calendar cell.
  * @docs-private
  */
-export class MdCalendarCell {
+export class MatCalendarCell {
   constructor(public value: number,
               public displayValue: string,
               public ariaLabel: string,
@@ -34,21 +36,24 @@ export class MdCalendarCell {
  */
 @Component({
   moduleId: module.id,
-  selector: '[md-calendar-body], [mat-calendar-body]',
+  selector: '[mat-calendar-body]',
   templateUrl: 'calendar-body.html',
   styleUrls: ['calendar-body.css'],
   host: {
     'class': 'mat-calendar-body',
+    'role': 'grid',
+    'attr.aria-readonly': 'true'
   },
+  exportAs: 'matCalendarBody',
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdCalendarBody {
+export class MatCalendarBody {
   /** The label for the table. (e.g. "Jan 2017"). */
   @Input() label: string;
 
   /** The cells to display in the table. */
-  @Input() rows: MdCalendarCell[][];
+  @Input() rows: MatCalendarCell[][];
 
   /** The value in the table that corresponds to today. */
   @Input() todayValue: number;
@@ -75,9 +80,11 @@ export class MdCalendarBody {
   @Input() cellAspectRatio = 1;
 
   /** Emits when a new value is selected. */
-  @Output() selectedValueChange = new EventEmitter<number>();
+  @Output() readonly selectedValueChange: EventEmitter<number> = new EventEmitter<number>();
 
-  _cellClicked(cell: MdCalendarCell): void {
+  constructor(private _elementRef: ElementRef, private _ngZone: NgZone) { }
+
+  _cellClicked(cell: MatCalendarCell): void {
     if (!this.allowDisabledSelection && !cell.enabled) {
       return;
     }
@@ -99,5 +106,14 @@ export class MdCalendarBody {
     }
 
     return cellNumber == this.activeCell;
+  }
+
+  /** Focuses the active cell after the microtask queue is empty. */
+  _focusActiveCell() {
+    this._ngZone.runOutsideAngular(() => {
+      this._ngZone.onStable.asObservable().pipe(take(1)).subscribe(() => {
+        this._elementRef.nativeElement.querySelector('.mat-calendar-body-active').focus();
+      });
+    });
   }
 }

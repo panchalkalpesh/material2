@@ -1,25 +1,22 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {MomentDateAdapter} from './moment-date-adapter';
-import {async, inject, TestBed} from '@angular/core/testing';
-import {MomentDateModule} from './index';
-import {DateAdapter, MAT_DATE_LOCALE} from '@angular/material';
 import {LOCALE_ID} from '@angular/core';
+import {async, inject, TestBed} from '@angular/core/testing';
+import {DateAdapter, DEC, FEB, JAN, MAR, MAT_DATE_LOCALE} from '@angular/material/core';
 import * as moment from 'moment';
-
-
-// Month constants for more readable tests.
-const JAN = 0, FEB = 1, MAR = 2, DEC = 11;
+import {MomentDateModule} from './index';
+import {MomentDateAdapter, MAT_MOMENT_DATE_ADAPTER_OPTIONS} from './moment-date-adapter';
 
 
 describe('MomentDateAdapter', () => {
   let adapter: MomentDateAdapter;
+  let assertValidDate: (d: moment.Moment | null, valid: boolean) => void;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
@@ -27,10 +24,17 @@ describe('MomentDateAdapter', () => {
     }).compileComponents();
   }));
 
-  beforeEach(inject([DateAdapter], (d: MomentDateAdapter) => {
+  beforeEach(inject([DateAdapter], (dateAdapter: MomentDateAdapter) => {
     moment.locale('en');
-    adapter = d;
+    adapter = dateAdapter;
     adapter.setLocale('en');
+
+    assertValidDate = (d: moment.Moment | null, valid: boolean) => {
+      expect(adapter.isDateInstance(d)).not.toBeNull(`Expected ${d} to be a date instance`);
+      expect(adapter.isValid(d!)).toBe(valid,
+          `Expected ${d} to be ${valid ? 'valid' : 'invalid'},` +
+          ` but was ${valid ? 'invalid' : 'valid'}`);
+    };
   }));
 
   it('should get year', () => {
@@ -139,7 +143,8 @@ describe('MomentDateAdapter', () => {
   });
 
   it('should create Moment date', () => {
-    expect(adapter.createDate(2017, JAN, 1).format()).toEqual(moment([2017,  JAN,  1]).format());
+    expect(adapter.createDate(2017, JAN, 1).format())
+      .toEqual(moment([2017,  JAN,  1]).format());
   });
 
   it('should not create Moment date with month over/under-flow', () => {
@@ -158,6 +163,10 @@ describe('MomentDateAdapter', () => {
     expect(adapter.createDate(50, JAN, 1).year()).toBe(50);
     expect(adapter.createDate(99, JAN, 1).year()).toBe(99);
     expect(adapter.createDate(100, JAN, 1).year()).toBe(100);
+  });
+
+  it('should not create Moment date in utc format', () => {
+    expect(adapter.createDate(2017, JAN, 5).isUTC()).toEqual(false);
   });
 
   it("should get today's date", () => {
@@ -309,6 +318,20 @@ describe('MomentDateAdapter', () => {
     expect(adapter.isDateInstance(d)).toBe(false);
   });
 
+  it('should create valid dates from valid ISO strings', () => {
+    assertValidDate(adapter.deserialize('1985-04-12T23:20:50.52Z'), true);
+    assertValidDate(adapter.deserialize('1996-12-19T16:39:57-08:00'), true);
+    assertValidDate(adapter.deserialize('1937-01-01T12:00:27.87+00:20'), true);
+    assertValidDate(adapter.deserialize('1990-13-31T23:59:00Z'), false);
+    assertValidDate(adapter.deserialize('1/1/2017'), false);
+    expect(adapter.deserialize('')).toBeNull();
+    expect(adapter.deserialize(null)).toBeNull();
+    assertValidDate(adapter.deserialize(new Date()), true);
+    assertValidDate(adapter.deserialize(new Date(NaN)), false);
+    assertValidDate(adapter.deserialize(moment()), true);
+    assertValidDate(adapter.deserialize(moment.invalid()), false);
+  });
+
   it('setLocale should not modify global moment locale', () => {
     expect(moment.locale()).toBe('en');
     adapter.setLocale('ja-JP');
@@ -342,10 +365,14 @@ describe('MomentDateAdapter', () => {
     adapter.addCalendarDays(date, 1);
     adapter.addCalendarMonths(date, 1);
     adapter.addCalendarYears(date, 1);
-    adapter.getISODateString(date);
+    adapter.toIso8601(date);
     adapter.isDateInstance(date);
     adapter.isValid(date);
     expect(date.locale()).toBe('en');
+  });
+
+  it('should create invalid date', () => {
+    assertValidDate(adapter.invalid(), false);
   });
 });
 
@@ -384,5 +411,26 @@ describe('MomentDateAdapter with LOCALE_ID override', () => {
 
   it('should take the default locale id from the LOCALE_ID injection token', () => {
     expect(adapter.format(moment([2017,  JAN,  2]), 'll')).toEqual('2 janv. 2017');
+  });
+});
+
+describe('MomentDateAdapter with MAT_MOMENT_DATE_ADAPTER_OPTIONS override', () => {
+  let adapter: MomentDateAdapter;
+
+  beforeEach(async(() => {
+    TestBed.configureTestingModule({
+      imports: [MomentDateModule],
+      providers: [
+        { provide: MAT_MOMENT_DATE_ADAPTER_OPTIONS, useValue: { useUtc: true } }
+      ]
+    }).compileComponents();
+  }));
+
+  beforeEach(inject([DateAdapter], (d: MomentDateAdapter) => {
+    adapter = d;
+  }));
+
+  it('should create Moment date in utc format if option useUtc is set', () => {
+    expect(adapter.createDate(2017, JAN, 5).isUTC()).toBeTruthy();
   });
 });

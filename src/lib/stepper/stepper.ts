@@ -1,132 +1,154 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {animate, state, style, transition, trigger} from '@angular/animations';
-import {CdkStep, CdkStepper} from '@angular/cdk/stepper';
+import {Directionality} from '@angular/cdk/bidi';
+import {CdkStep, CdkStepper, StepContentPositionState} from '@angular/cdk/stepper';
+import {AnimationEvent} from '@angular/animations';
 import {
+  AfterContentInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ContentChild,
   ContentChildren,
   Directive,
-  ElementRef,
+  EventEmitter,
   forwardRef,
   Inject,
   Optional,
+  Output,
   QueryList,
   SkipSelf,
+  TemplateRef,
   ViewChildren,
   ViewEncapsulation,
 } from '@angular/core';
 import {FormControl, FormGroupDirective, NgForm} from '@angular/forms';
-import {
-  defaultErrorStateMatcher,
-  ErrorOptions,
-  ErrorStateMatcher,
-  MD_ERROR_GLOBAL_OPTIONS,
-} from '@angular/material/core';
-import {MdStepHeader} from './step-header';
-import {MdStepLabel} from './step-label';
+import {ErrorStateMatcher} from '@angular/material/core';
+import {MatStepHeader} from './step-header';
+import {MatStepLabel} from './step-label';
+import {takeUntil} from 'rxjs/operators';
+import {matStepperAnimations} from './stepper-animations';
+import {MatStepperIcon, MatStepperIconContext} from './stepper-icon';
 
-/** Workaround for https://github.com/angular/angular/issues/17849 */
-export const _MdStep = CdkStep;
-export const _MdStepper = CdkStepper;
 
 @Component({
   moduleId: module.id,
-  selector: 'md-step, mat-step',
+  selector: 'mat-step',
   templateUrl: 'step.html',
-  providers: [{provide: MD_ERROR_GLOBAL_OPTIONS, useExisting: MdStep}],
-  encapsulation: ViewEncapsulation.None
+  providers: [{provide: ErrorStateMatcher, useExisting: MatStep}],
+  encapsulation: ViewEncapsulation.None,
+  exportAs: 'matStep',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdStep extends _MdStep implements ErrorOptions {
-  /** Content for step label given by <ng-template matStepLabel> or <ng-template mdStepLabel>. */
-  @ContentChild(MdStepLabel) stepLabel: MdStepLabel;
+export class MatStep extends CdkStep implements ErrorStateMatcher {
+  /** Content for step label given by `<ng-template matStepLabel>`. */
+  @ContentChild(MatStepLabel) stepLabel: MatStepLabel;
 
-  /** Original ErrorStateMatcher that checks the validity of form control. */
-  private _originalErrorStateMatcher: ErrorStateMatcher;
-
-  constructor(@Inject(forwardRef(() => MdStepper)) mdStepper: MdStepper,
-              @Optional() @SkipSelf() @Inject(MD_ERROR_GLOBAL_OPTIONS) errorOptions: ErrorOptions) {
-    super(mdStepper);
-    if (errorOptions && errorOptions.errorStateMatcher) {
-      this._originalErrorStateMatcher = errorOptions.errorStateMatcher;
-    } else {
-      this._originalErrorStateMatcher = defaultErrorStateMatcher;
-    }
+  constructor(@Inject(forwardRef(() => MatStepper)) stepper: MatStepper,
+              @SkipSelf() private _errorStateMatcher: ErrorStateMatcher) {
+    super(stepper);
   }
 
   /** Custom error state matcher that additionally checks for validity of interacted form. */
-  errorStateMatcher = (control: FormControl, form: FormGroupDirective | NgForm) => {
-    let originalErrorState = this._originalErrorStateMatcher(control, form);
+  isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
+    const originalErrorState = this._errorStateMatcher.isErrorState(control, form);
 
     // Custom error state checks for the validity of form that is not submitted or touched
     // since user can trigger a form change by calling for another step without directly
     // interacting with the current form.
-    let customErrorState =  control.invalid && this.interacted;
+    const customErrorState = !!(control && control.invalid && this.interacted);
 
     return originalErrorState || customErrorState;
   }
 }
 
+
 @Directive({
-  selector: '[mdStepper]'
+  selector: '[matStepper]'
 })
-export class MdStepper extends _MdStepper {
+export class MatStepper extends CdkStepper implements AfterContentInit {
   /** The list of step headers of the steps in the stepper. */
-  @ViewChildren(MdStepHeader, {read: ElementRef}) _stepHeader: QueryList<ElementRef>;
+  @ViewChildren(MatStepHeader) _stepHeader: QueryList<MatStepHeader>;
 
   /** Steps that the stepper holds. */
-  @ContentChildren(MdStep) _steps: QueryList<MdStep>;
+  @ContentChildren(MatStep) _steps: QueryList<MatStep>;
+
+  /** Custom icon overrides passed in by the consumer. */
+  @ContentChildren(MatStepperIcon) _icons: QueryList<MatStepperIcon>;
+
+  /** Event emitted when the current step is done transitioning in. */
+  @Output() readonly animationDone: EventEmitter<void> = new EventEmitter<void>();
+
+  /** Consumer-specified template-refs to be used to override the header icons. */
+  _iconOverrides: {[key: string]: TemplateRef<MatStepperIconContext>} = {};
+
+  ngAfterContentInit() {
+    const icons = this._icons.toArray();
+
+    ['edit', 'done', 'number'].forEach(name => {
+      const override = icons.find(icon => icon.name === name);
+
+      if (override) {
+        this._iconOverrides[name] = override.templateRef;
+      }
+    });
+
+    // Mark the component for change detection whenever the content children query changes
+    this._steps.changes.pipe(takeUntil(this._destroyed)).subscribe(() => this._stateChanged());
+  }
+
+  _animationDone(event: AnimationEvent) {
+    if ((event.toState as StepContentPositionState) === 'current') {
+      this.animationDone.emit();
+    }
+  }
 }
 
 @Component({
   moduleId: module.id,
-  selector: 'md-horizontal-stepper, mat-horizontal-stepper',
+  selector: 'mat-horizontal-stepper',
+  exportAs: 'matHorizontalStepper',
   templateUrl: 'stepper-horizontal.html',
   styleUrls: ['stepper.css'],
   inputs: ['selectedIndex'],
   host: {
     'class': 'mat-stepper-horizontal',
+    'aria-orientation': 'horizontal',
     'role': 'tablist',
   },
-  animations: [
-    trigger('stepTransition', [
-      state('previous', style({transform: 'translate3d(-100%, 0, 0)', visibility: 'hidden'})),
-      state('current', style({transform: 'translate3d(0%, 0, 0)', visibility: 'visible'})),
-      state('next', style({transform: 'translate3d(100%, 0, 0)', visibility: 'hidden'})),
-      transition('* => *',
-          animate('500ms cubic-bezier(0.35, 0, 0.25, 1)'))
-    ])
-  ],
-  providers: [{provide: MdStepper, useExisting: MdHorizontalStepper}],
-  encapsulation: ViewEncapsulation.None
+  animations: [matStepperAnimations.horizontalStepTransition],
+  providers: [{provide: MatStepper, useExisting: MatHorizontalStepper}],
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdHorizontalStepper extends MdStepper { }
+export class MatHorizontalStepper extends MatStepper { }
 
 @Component({
   moduleId: module.id,
-  selector: 'md-vertical-stepper, mat-vertical-stepper',
+  selector: 'mat-vertical-stepper',
+  exportAs: 'matVerticalStepper',
   templateUrl: 'stepper-vertical.html',
   styleUrls: ['stepper.css'],
   inputs: ['selectedIndex'],
   host: {
     'class': 'mat-stepper-vertical',
+    'aria-orientation': 'vertical',
     'role': 'tablist',
   },
-  animations: [
-    trigger('stepTransition', [
-      state('previous', style({height: '0px', visibility: 'hidden'})),
-      state('next', style({height: '0px', visibility: 'hidden'})),
-      state('current', style({height: '*', visibility: 'visible'})),
-      transition('* <=> current', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)'))
-    ])
-  ],
-  providers: [{provide: MdStepper, useExisting: MdVerticalStepper}],
-  encapsulation: ViewEncapsulation.None
+  animations: [matStepperAnimations.verticalStepTransition],
+  providers: [{provide: MatStepper, useExisting: MatVerticalStepper}],
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdVerticalStepper extends MdStepper { }
+export class MatVerticalStepper extends MatStepper {
+  constructor(@Optional() dir: Directionality, changeDetectorRef: ChangeDetectorRef) {
+    super(dir, changeDetectorRef);
+    this._orientation = 'vertical';
+  }
+}

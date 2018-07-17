@@ -1,30 +1,60 @@
 $mat-paginator-height: 56px;
 $mat-paginator-padding: 0 8px;
 
-$mat-paginator-items-per-page-label-margin: 0 4px;
-$mat-paginator-selector-margin: 0 4px;
-$mat-paginator-selector-trigger-min-width: 56px;
+$mat-paginator-page-size-margin-right: 8px;
 
-$mat-paginator-range-label-margin: 0 32px;
+$mat-paginator-items-per-page-label-margin: 0 4px;
+$mat-paginator-selector-margin: 6px 4px 0 4px;
+$mat-paginator-selector-trigger-width: 56px;
+$mat-paginator-selector-trigger-outline-width: 64px;
+$mat-paginator-selector-trigger-fill-width: 64px;
+
+/** @deprecated Use `$mat-paginator-selector-trigger-width` instead. @deletion-target 8.0.0 */
+$mat-paginator-selector-trigger-min-width: $mat-paginator-selector-trigger-width;
+
+$mat-paginator-range-actions-min-height: 48px;
+
+$mat-paginator-range-label-margin: 0 32px 0 24px;
 
 $mat-paginator-button-margin: 8px;
 $mat-paginator-button-icon-height: 8px;
 $mat-paginator-button-icon-width: 8px;
 
-$mat-paginator-button-decrement-icon-margin: 12px;
-$mat-paginator-button-increment-icon-margin: 16px;
+$mat-paginator-button-increment-icon-margin: 12px;
+$mat-paginator-button-decrement-icon-margin: 16px;
+
+$mat-paginator-button-first-last-icon-width: 14px;
+
+$mat-paginator-button-first-icon-margin: 3px;
+$mat-paginator-button-last-icon-margin: 15px;
+
+
+$mat-paginator-button-first-decrement-icon-margin: 21px;
+$mat-paginator-button-last-increment-icon-margin: 9px;
+
 
 .mat-paginator {
+  display: block;
+}
+
+.mat-paginator-container {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   min-height: $mat-paginator-height;
   padding: $mat-paginator-padding;
+  flex-wrap: wrap-reverse;
 }
 
 .mat-paginator-page-size {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  margin-right: $mat-paginator-page-size-margin-right;
+
+  [dir='rtl'] & {
+    margin-right: 0;
+    margin-left: $mat-paginator-page-size-margin-right;
+  }
 }
 
 .mat-paginator-page-size-label {
@@ -32,12 +62,15 @@ $mat-paginator-button-increment-icon-margin: 16px;
 }
 
 .mat-paginator-page-size-select {
-  // Since the select won't have a placeholder we can remove the space that is reserved for it.
-  padding-top: 0;
   margin: $mat-paginator-selector-margin;
+  width: $mat-paginator-selector-trigger-width;
 
-  .mat-select-trigger {
-    min-width: $mat-paginator-selector-trigger-min-width;
+  &.mat-form-field-appearance-outline {
+    width: $mat-paginator-selector-trigger-outline-width;
+  }
+
+  &.mat-form-field-appearance-fill {
+    width: $mat-paginator-selector-trigger-fill-width;
   }
 }
 
@@ -45,39 +78,17 @@ $mat-paginator-button-increment-icon-margin: 16px;
   margin: $mat-paginator-range-label-margin;
 }
 
-.mat-paginator-increment-button + .mat-paginator-increment-button {
-  margin: 0 0 0 $mat-paginator-button-margin;
+.mat-paginator-range-actions {
+  display: flex;
+  align-items: center;
+  min-height: $mat-paginator-range-actions-min-height;
+}
+
+.mat-paginator-icon {
+  width: $mat-paginator-height / 2;
+  fill: currentColor;
 
   [dir='rtl'] & {
-    margin: 0 $mat-paginator-button-margin 0 0;
-  }
-}
-
-.mat-paginator-increment,
-.mat-paginator-decrement {
-  width: $mat-paginator-button-icon-width;
-  height: $mat-paginator-button-icon-height;
-}
-
-.mat-paginator-decrement,
-[dir='rtl'] .mat-paginator-increment {
-  transform: rotate(45deg);
-}
-.mat-paginator-increment,
-[dir='rtl'] .mat-paginator-decrement {
-  transform: rotate(225deg);
-}
-
-.mat-paginator-decrement {
-  margin-left: $mat-paginator-button-decrement-icon-margin;
-  [dir='rtl'] & {
-    margin-right: $mat-paginator-button-decrement-icon-margin;
-  }
-}
-
-.mat-paginator-increment {
-  margin-left: $mat-paginator-button-increment-icon-margin;
-  [dir='rtl'] & {
-    margin-right: $mat-paginator-button-increment-icon-margin;
+    transform: rotate(180deg);
   }
 }

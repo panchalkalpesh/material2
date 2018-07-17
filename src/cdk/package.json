@@ -23,10 +23,18 @@
   },
   "homepage": "https://github.com/angular/material2#readme",
   "peerDependencies": {
-    "@angular/core": "^4.4.1",
-    "@angular/common": "^4.4.1"
+    "@angular/core": "0.0.0-NG",
+    "@angular/common": "0.0.0-NG"
   },
   "dependencies": {
     "tslib": "^1.7.1"
-  }
+  },
+  "ng-update": {
+    "packageGroup": [
+      "@angular/material",
+      "@angular/cdk",
+      "@angular/material-moment-adapter"
+    ]
+  },
+  "sideEffects": false
 }

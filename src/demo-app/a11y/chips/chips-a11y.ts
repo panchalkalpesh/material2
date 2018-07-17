@@ -1,5 +1,13 @@
+/**
+ * @license
+ * Copyright Google LLC All Rights Reserved.
+ *
+ * Use of this source code is governed by an MIT-style license that can be
+ * found in the LICENSE file at https://angular.io/license
+ */
+
 import {Component} from '@angular/core';
-import {MdChipInputEvent, MdSnackBar} from '@angular/material';
+import {MatChipInputEvent, MatSnackBar} from '@angular/material';
 
 
 export interface Person {
@@ -21,30 +29,30 @@ export class ChipsAccessibilityDemo {
   message: string = '';
 
   people: Person[] = [
-    { name: 'Kara' },
-    { name: 'Jeremy' },
-    { name: 'Topher' },
-    { name: 'Elad' },
-    { name: 'Kristiyan' },
-    { name: 'Paul' }
+    {name: 'Kara'},
+    {name: 'Jeremy'},
+    {name: 'Topher'},
+    {name: 'Elad'},
+    {name: 'Kristiyan'},
+    {name: 'Paul'}
   ];
 
   availableColors = [
-    { name: 'none', color: '' },
-    { name: 'Primary', color: 'primary' },
-    { name: 'Accent', color: 'accent' },
-    { name: 'Warn', color: 'warn' }
+    {name: 'none', color: ''},
+    {name: 'Primary', color: 'primary'},
+    {name: 'Accent', color: 'accent'},
+    {name: 'Warn', color: 'warn'}
   ];
 
-  constructor(public snackBar: MdSnackBar) {}
+  constructor(public snackBar: MatSnackBar) {}
 
   displayMessage(message: string): void {
     this.message = message;
   }
 
-  add(event: MdChipInputEvent): void {
-    let input = event.input;
-    let value = event.value;
+  add(event: MatChipInputEvent): void {
+    const input = event.input;
+    const value = event.value;
 
     // Add our person
     if ((value || '').trim()) {
@@ -61,7 +69,7 @@ export class ChipsAccessibilityDemo {
   }
 
   remove(person: Person): void {
-    let index = this.people.indexOf(person);
+    const index = this.people.indexOf(person);
 
     if (index >= 0) {
       this.people.splice(index, 1);
@@ -72,6 +80,4 @@ export class ChipsAccessibilityDemo {
   toggleVisible(): void {
     this.visible = false;
   }
-
-
 }

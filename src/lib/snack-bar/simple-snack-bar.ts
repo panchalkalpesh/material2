@@ -1,14 +1,15 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
 import {Component, ViewEncapsulation, Inject, ChangeDetectionStrategy} from '@angular/core';
-import {MdSnackBarRef} from './snack-bar-ref';
-import {MD_SNACK_BAR_DATA} from './snack-bar-config';
+import {MatSnackBarRef} from './snack-bar-ref';
+import {MAT_SNACK_BAR_DATA} from './snack-bar-config';
+import {matSnackBarAnimations} from './snack-bar-animations';
 
 
 /**
@@ -22,7 +23,9 @@ import {MD_SNACK_BAR_DATA} from './snack-bar-config';
   styleUrls: ['simple-snack-bar.css'],
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  animations: [matSnackBarAnimations.contentFade],
   host: {
+    '[@contentFade]': '',
     'class': 'mat-simple-snackbar',
   }
 })
@@ -31,14 +34,14 @@ export class SimpleSnackBar {
   data: { message: string, action: string };
 
   constructor(
-    public snackBarRef: MdSnackBarRef<SimpleSnackBar>,
-    @Inject(MD_SNACK_BAR_DATA) data: any) {
+    public snackBarRef: MatSnackBarRef<SimpleSnackBar>,
+    @Inject(MAT_SNACK_BAR_DATA) data: any) {
     this.data = data;
   }
 
   /** Performs the action on the snack bar. */
   action(): void {
-    this.snackBarRef.closeWithAction();
+    this.snackBarRef.dismissWithAction();
   }
 
   /** If the action button should be shown. */

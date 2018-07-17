@@ -1,21 +1,16 @@
 import {async, ComponentFixture, TestBed} from '@angular/core/testing';
 import {Component, DebugElement} from '@angular/core';
 import {By} from '@angular/platform-browser';
-import {ViewportRuler} from '@angular/cdk/scrolling';
-import {FakeViewportRuler} from '@angular/cdk/testing';
-import {MdButtonModule} from './index';
-import {MdRipple} from '@angular/material/core';
+import {MatButtonModule, MatButton} from './index';
+import {MatRipple, ThemePalette} from '@angular/material/core';
 
 
-describe('MdButton', () => {
+describe('MatButton', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdButtonModule],
+      imports: [MatButtonModule],
       declarations: [TestApp],
-      providers: [
-        {provide: ViewportRuler, useClass: FakeViewportRuler},
-      ]
     });
 
     TestBed.compileComponents();
@@ -46,6 +41,13 @@ describe('MdButton', () => {
     expect(aDebugElement.nativeElement.classList).not.toContain('mat-accent');
   });
 
+  it('should expose the ripple instance', () => {
+    const fixture = TestBed.createComponent(TestApp);
+    const button = fixture.debugElement.query(By.css('button')).componentInstance as MatButton;
+
+    expect(button.ripple).toBeTruthy();
+  });
+
   it('should should not clear previous defined classes', () => {
     let fixture = TestBed.createComponent(TestApp);
     let testComponent = fixture.debugElement.componentInstance;
@@ -67,10 +69,10 @@ describe('MdButton', () => {
     expect(buttonDebugElement.nativeElement.classList.contains('custom-class')).toBe(true);
   });
 
-  describe('button[md-fab]', () => {
+  describe('button[mat-fab]', () => {
     it('should have accent palette by default', () => {
       const fixture = TestBed.createComponent(TestApp);
-      const fabButtonDebugEl = fixture.debugElement.query(By.css('button[md-fab]'));
+      const fabButtonDebugEl = fixture.debugElement.query(By.css('button[mat-fab]'));
 
       fixture.detectChanges();
 
@@ -79,10 +81,10 @@ describe('MdButton', () => {
     });
   });
 
-  describe('button[md-mini-fab]', () => {
+  describe('button[mat-mini-fab]', () => {
     it('should have accent palette by default', () => {
       const fixture = TestBed.createComponent(TestApp);
-      const miniFabButtonDebugEl = fixture.debugElement.query(By.css('button[md-mini-fab]'));
+      const miniFabButtonDebugEl = fixture.debugElement.query(By.css('button[mat-mini-fab]'));
 
       fixture.detectChanges();
 
@@ -92,7 +94,7 @@ describe('MdButton', () => {
   });
 
   // Regular button tests
-  describe('button[md-button]', () => {
+  describe('button[mat-button]', () => {
     it('should handle a click on the button', () => {
       let fixture = TestBed.createComponent(TestApp);
       let testComponent = fixture.debugElement.componentInstance;
@@ -128,7 +130,7 @@ describe('MdButton', () => {
   });
 
   // Anchor button tests
-  describe('a[md-button]', () => {
+  describe('a[mat-button]', () => {
     it('should not redirect if disabled', () => {
       let fixture = TestBed.createComponent(TestApp);
       let testComponent = fixture.debugElement.componentInstance;
@@ -180,6 +182,24 @@ describe('MdButton', () => {
       expect(buttonDebugElement.nativeElement.getAttribute('disabled'))
         .toBeNull('Expect no disabled');
     });
+
+    it('should be able to set a custom tabindex', () => {
+      let fixture = TestBed.createComponent(TestApp);
+      let testComponent = fixture.debugElement.componentInstance;
+      let buttonElement = fixture.debugElement.query(By.css('a')).nativeElement;
+
+      fixture.componentInstance.tabIndex = 3;
+      fixture.detectChanges();
+
+      expect(buttonElement.getAttribute('tabIndex'))
+          .toBe('3', 'Expected custom tabindex to be set');
+
+      testComponent.isDisabled = true;
+      fixture.detectChanges();
+
+      expect(buttonElement.getAttribute('tabIndex'))
+          .toBe('-1', 'Expected custom tabindex to be overwritten when disabled.');
+    });
   });
 
   // Ripple tests.
@@ -188,10 +208,10 @@ describe('MdButton', () => {
     let testComponent: TestApp;
     let buttonDebugElement: DebugElement;
     let buttonRippleDebugElement: DebugElement;
-    let buttonRippleInstance: MdRipple;
+    let buttonRippleInstance: MatRipple;
     let anchorDebugElement: DebugElement;
     let anchorRippleDebugElement: DebugElement;
-    let anchorRippleInstance: MdRipple;
+    let anchorRippleInstance: MatRipple;
 
     beforeEach(() => {
       fixture = TestBed.createComponent(TestApp);
@@ -199,16 +219,16 @@ describe('MdButton', () => {
 
       testComponent = fixture.componentInstance;
 
-      buttonDebugElement = fixture.debugElement.query(By.css('button[md-button]'));
-      buttonRippleDebugElement = buttonDebugElement.query(By.directive(MdRipple));
-      buttonRippleInstance = buttonRippleDebugElement.injector.get<MdRipple>(MdRipple);
+      buttonDebugElement = fixture.debugElement.query(By.css('button[mat-button]'));
+      buttonRippleDebugElement = buttonDebugElement.query(By.directive(MatRipple));
+      buttonRippleInstance = buttonRippleDebugElement.injector.get<MatRipple>(MatRipple);
 
-      anchorDebugElement = fixture.debugElement.query(By.css('a[md-button]'));
-      anchorRippleDebugElement = anchorDebugElement.query(By.directive(MdRipple));
-      anchorRippleInstance = anchorRippleDebugElement.injector.get<MdRipple>(MdRipple);
+      anchorDebugElement = fixture.debugElement.query(By.css('a[mat-button]'));
+      anchorRippleDebugElement = anchorDebugElement.query(By.directive(MatRipple));
+      anchorRippleInstance = anchorRippleDebugElement.injector.get<MatRipple>(MatRipple);
     });
 
-    it('should disable the ripple if mdRippleDisabled input is set', () => {
+    it('should disable the ripple if matRippleDisabled input is set', () => {
       expect(buttonRippleInstance.disabled).toBeFalsy();
 
       testComponent.rippleDisabled = true;
@@ -219,42 +239,47 @@ describe('MdButton', () => {
 
     it('should disable the ripple when the button is disabled', () => {
       expect(buttonRippleInstance.disabled).toBeFalsy(
-        'Expected an enabled button[md-button] to have an enabled ripple'
+        'Expected an enabled button[mat-button] to have an enabled ripple'
       );
       expect(anchorRippleInstance.disabled).toBeFalsy(
-        'Expected an enabled a[md-button] to have an enabled ripple'
+        'Expected an enabled a[mat-button] to have an enabled ripple'
       );
 
       testComponent.isDisabled = true;
       fixture.detectChanges();
 
       expect(buttonRippleInstance.disabled).toBeTruthy(
-        'Expected a disabled button[md-button] not to have an enabled ripple'
+        'Expected a disabled button[mat-button] not to have an enabled ripple'
       );
       expect(anchorRippleInstance.disabled).toBeTruthy(
-        'Expected a disabled a[md-button] not to have an enabled ripple'
+        'Expected a disabled a[mat-button] not to have an enabled ripple'
       );
     });
   });
 });
 
-/** Test component that contains an MdButton. */
+/** Test component that contains an MatButton. */
 @Component({
   selector: 'test-app',
   template: `
-    <button md-button type="button" (click)="increment()"
+    <button [tabIndex]="tabIndex" mat-button type="button" (click)="increment()"
       [disabled]="isDisabled" [color]="buttonColor" [disableRipple]="rippleDisabled">
       Go
     </button>
-    <a href="http://www.google.com" md-button [disabled]="isDisabled" [color]="buttonColor">Link</a>
-    <button md-fab>Fab Button</button>
-    <button md-mini-fab>Mini Fab Button</button>
+    <a [tabIndex]="tabIndex" href="http://www.google.com" mat-button [disabled]="isDisabled"
+      [color]="buttonColor">
+      Link
+    </a>
+    <button mat-fab>Fab Button</button>
+    <button mat-mini-fab>Mini Fab Button</button>
   `
 })
 class TestApp {
   clickCount: number = 0;
   isDisabled: boolean = false;
   rippleDisabled: boolean = false;
+  buttonColor: ThemePalette;
+  tabIndex: number;
 
   increment() {
     this.clickCount++;

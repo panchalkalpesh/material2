@@ -1,17 +1,27 @@
-import {async, ComponentFixture, inject, TestBed} from '@angular/core/testing';
-import {Component, NgModule, ViewChild, ViewContainerRef} from '@angular/core';
+import {async, fakeAsync, tick, ComponentFixture, inject, TestBed} from '@angular/core/testing';
+import {
+  Component,
+  NgModule,
+  ViewChild,
+  ViewContainerRef,
+  ErrorHandler,
+  Injectable,
+  EventEmitter,
+} from '@angular/core';
+import {Direction, Directionality} from '@angular/cdk/bidi';
+import {dispatchFakeEvent} from '@angular/cdk/testing';
 import {
   ComponentPortal,
   PortalModule,
   TemplatePortal,
-  TemplatePortalDirective
+  CdkPortal
 } from '@angular/cdk/portal';
 import {
   Overlay,
   OverlayContainer,
   OverlayModule,
   OverlayRef,
-  OverlayState,
+  OverlayConfig,
   PositionStrategy,
   ScrollStrategy,
 } from './index';
@@ -20,25 +30,31 @@ import {
 describe('Overlay', () => {
   let overlay: Overlay;
   let componentPortal: ComponentPortal<PizzaMsg>;
-  let templatePortal: TemplatePortal<any>;
+  let templatePortal: TemplatePortal;
   let overlayContainerElement: HTMLElement;
+  let overlayContainer: OverlayContainer;
   let viewContainerFixture: ComponentFixture<TestComponentWithTemplatePortals>;
+  let dir: Direction;
 
   beforeEach(async(() => {
+    dir = 'ltr';
     TestBed.configureTestingModule({
       imports: [OverlayModule, PortalModule, OverlayTestModule],
       providers: [{
-        provide: OverlayContainer,
+        provide: Directionality,
         useFactory: () => {
-          overlayContainerElement = document.createElement('div');
-          return {getContainerElement: () => overlayContainerElement};
+          const fakeDirectionality = {};
+          Object.defineProperty(fakeDirectionality, 'value', {get: () => dir});
+          return fakeDirectionality;
         }
-      }]
+      }],
     }).compileComponents();
   }));
 
-  beforeEach(inject([Overlay], (o: Overlay) => {
+  beforeEach(inject([Overlay, OverlayContainer], (o: Overlay, oc: OverlayContainer) => {
     overlay = o;
+    overlayContainer = oc;
+    overlayContainerElement = oc.getContainerElement();
 
     let fixture = TestBed.createComponent(TestComponentWithTemplatePortals);
     fixture.detectChanges();
@@ -46,6 +62,10 @@ describe('Overlay', () => {
     componentPortal = new ComponentPortal(PizzaMsg, fixture.componentInstance.viewContainerRef);
     viewContainerFixture = fixture;
   }));
+
+  afterEach(() => {
+    overlayContainer.ngOnDestroy();
+  });
 
   it('should load a component into an overlay', () => {
     let overlayRef = overlay.create();
@@ -107,16 +127,16 @@ describe('Overlay', () => {
     expect(overlayContainerElement.textContent).toBe('');
   });
 
-  it('should ensure that the most-recently-attached overlay is on top', () => {
+  it('should ensure that the most-recently-attached overlay is on top', (() => {
     let pizzaOverlayRef = overlay.create();
     let cakeOverlayRef = overlay.create();
 
     pizzaOverlayRef.attach(componentPortal);
     cakeOverlayRef.attach(templatePortal);
 
-    expect(pizzaOverlayRef.overlayElement.nextSibling)
+    expect(pizzaOverlayRef.hostElement.nextSibling)
         .toBeTruthy('Expected pizza to be on the bottom.');
-    expect(cakeOverlayRef.overlayElement.nextSibling)
+    expect(cakeOverlayRef.hostElement.nextSibling)
         .toBeFalsy('Expected cake to be on top.');
 
     pizzaOverlayRef.dispose();
@@ -126,19 +146,27 @@ describe('Overlay', () => {
     pizzaOverlayRef.attach(componentPortal);
     cakeOverlayRef.attach(templatePortal);
 
-    expect(pizzaOverlayRef.overlayElement.nextSibling)
+    expect(pizzaOverlayRef.hostElement.nextSibling)
         .toBeTruthy('Expected pizza to still be on the bottom.');
-    expect(cakeOverlayRef.overlayElement.nextSibling)
+    expect(cakeOverlayRef.hostElement.nextSibling)
         .toBeFalsy('Expected cake to still be on top.');
+  }));
+
+  it('should take the default direction from the global Directionality', () => {
+    dir = 'rtl';
+    const overlayRef = overlay.create();
+
+    overlayRef.attach(componentPortal);
+    expect(overlayRef.hostElement.getAttribute('dir')).toBe('rtl');
   });
 
   it('should set the direction', () => {
-    const state = new OverlayState({direction: 'rtl'});
+    const config = new OverlayConfig({direction: 'rtl'});
+    const overlayRef = overlay.create(config);
 
-    overlay.create(state).attach(componentPortal);
+    overlayRef.attach(componentPortal);
 
-    const pane = overlayContainerElement.children[0] as HTMLElement;
-    expect(pane.getAttribute('dir')).toEqual('rtl');
+    expect(overlayRef.hostElement.getAttribute('dir')).toBe('rtl');
   });
 
   it('should emit when an overlay is attached', () => {
@@ -152,8 +180,8 @@ describe('Overlay', () => {
   });
 
   it('should emit the attachment event after everything is added to the DOM', () => {
-    let state = new OverlayState({hasBackdrop: true});
-    let overlayRef = overlay.create(state);
+    let config = new OverlayConfig({hasBackdrop: true});
+    let overlayRef = overlay.create(config);
 
     overlayRef.attachments().subscribe(() => {
       expect(overlayContainerElement.querySelector('pizza'))
@@ -175,6 +203,26 @@ describe('Overlay', () => {
     overlayRef.detach();
 
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('should not emit to the detach stream if the overlay has not been attached', () => {
+    let overlayRef = overlay.create();
+    let spy = jasmine.createSpy('detachments spy');
+
+    overlayRef.detachments().subscribe(spy);
+    overlayRef.detach();
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('should not emit to the detach stream on dispose if the overlay was not attached', () => {
+    let overlayRef = overlay.create();
+    let spy = jasmine.createSpy('detachments spy');
+
+    overlayRef.detachments().subscribe(spy);
+    overlayRef.dispose();
+
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('should emit the detachment event after the overlay is removed from the DOM', () => {
@@ -219,111 +267,248 @@ describe('Overlay', () => {
     expect(callbackOrder).toEqual(['attach', 'detach']);
   });
 
+  it('should default to the ltr direction', () => {
+    const overlayRef = overlay.create();
+    expect(overlayRef.getConfig().direction).toBe('ltr');
+  });
+
+  it('should skip undefined values when applying the defaults', () => {
+    const overlayRef = overlay.create({direction: undefined});
+    expect(overlayRef.getConfig().direction).toBe('ltr');
+  });
+
+  it('should clear out all DOM element references on dispose', fakeAsync(() => {
+    const overlayRef = overlay.create({hasBackdrop: true});
+    overlayRef.attach(componentPortal);
+
+    expect(overlayRef.hostElement).toBeTruthy('Expected overlay host to be defined.');
+    expect(overlayRef.overlayElement).toBeTruthy('Expected overlay element to be defined.');
+    expect(overlayRef.backdropElement).toBeTruthy('Expected backdrop element to be defined.');
+
+    overlayRef.dispose();
+    tick(500);
+
+    expect(overlayRef.hostElement).toBeFalsy('Expected overlay host not to be referenced.');
+    expect(overlayRef.overlayElement).toBeFalsy('Expected overlay element not to be referenced.');
+    expect(overlayRef.backdropElement).toBeFalsy('Expected backdrop element not to be referenced.');
+  }));
+
+  it('should clear the backdrop timeout if the transition finishes first', fakeAsync(() => {
+    const overlayRef = overlay.create({hasBackdrop: true});
+
+    overlayRef.attach(componentPortal);
+    overlayRef.detach();
+
+    const backdrop = overlayContainerElement.querySelector('.cdk-overlay-backdrop')!;
+    dispatchFakeEvent(backdrop, 'transitionend');
+
+    // Note: we don't `tick` or `flush` here. The assertion is that
+    // `fakeAsync` will throw if we have an unflushed timer.
+  }));
+
+  it('should be able to use the `Overlay` provider during app initialization', () => {
+    /** Dummy provider that depends on `Overlay`. */
+    @Injectable()
+    class CustomErrorHandler extends ErrorHandler {
+      constructor(private _overlay: Overlay) { super(); }
+
+      handleError(error: any) {
+        const overlayRef = this._overlay.create({hasBackdrop: !!error});
+        overlayRef.dispose();
+      }
+    }
+
+    overlayContainer.ngOnDestroy();
+
+    TestBed
+      .resetTestingModule()
+      .configureTestingModule({
+        imports: [OverlayModule],
+        providers: [
+          CustomErrorHandler,
+          {provide: ErrorHandler, useExisting: CustomErrorHandler}
+        ]
+      });
+
+    expect(() => TestBed.compileComponents()).not.toThrow();
+  });
+
+  it('should keep the direction in sync with the passed in Directionality', () => {
+    const customDirectionality = {value: 'rtl', change: new EventEmitter()};
+    const overlayRef = overlay.create({direction: customDirectionality as Directionality});
+
+    expect(overlayRef.getDirection()).toBe('rtl');
+    customDirectionality.value = 'ltr';
+    expect(overlayRef.getDirection()).toBe('ltr');
+  });
+
   describe('positioning', () => {
-    let state: OverlayState;
+    let config: OverlayConfig;
 
     beforeEach(() => {
-      state = new OverlayState();
+      config = new OverlayConfig();
     });
 
-    it('should apply the positioning strategy', () => {
-      state.positionStrategy = new FakePositionStrategy();
+    it('should apply the positioning strategy', fakeAsync(() => {
+      config.positionStrategy = new FakePositionStrategy();
 
-      overlay.create(state).attach(componentPortal);
+      overlay.create(config).attach(componentPortal);
+      viewContainerFixture.detectChanges();
+      tick();
 
       expect(overlayContainerElement.querySelectorAll('.fake-positioned').length).toBe(1);
-    });
+    }));
+
+    it('should not apply the position if it detaches before the zone stabilizes', fakeAsync(() => {
+      config.positionStrategy = new FakePositionStrategy();
+
+      const overlayRef = overlay.create(config);
+
+      spyOn(config.positionStrategy, 'apply');
+
+      overlayRef.attach(componentPortal);
+      overlayRef.detach();
+      viewContainerFixture.detectChanges();
+      tick();
+
+      expect(config.positionStrategy.apply).not.toHaveBeenCalled();
+    }));
+
   });
 
   describe('size', () => {
-    let state: OverlayState;
+    let config: OverlayConfig;
 
     beforeEach(() => {
-      state = new OverlayState();
+      config = new OverlayConfig();
     });
 
     it('should apply the width set in the config', () => {
-      state.width = 500;
+      config.width = 500;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.width).toEqual('500px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.width).toBe('500px');
     });
 
     it('should support using other units if a string width is provided', () => {
-      state.width = '200%';
+      config.width = '200%';
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.width).toEqual('200%');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.width).toBe('200%');
     });
 
     it('should apply the height set in the config', () => {
-      state.height = 500;
+      config.height = 500;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.height).toEqual('500px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.height).toBe('500px');
     });
 
     it('should support using other units if a string height is provided', () => {
-      state.height = '100vh';
+      config.height = '100vh';
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.height).toEqual('100vh');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.height).toBe('100vh');
     });
 
     it('should apply the min width set in the config', () => {
-      state.minWidth = 200;
+      config.minWidth = 200;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.minWidth).toEqual('200px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.minWidth).toBe('200px');
     });
 
-
     it('should apply the min height set in the config', () => {
-      state.minHeight = 500;
+      config.minHeight = 500;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.minHeight).toEqual('500px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.minHeight).toBe('500px');
     });
 
     it('should apply the max width set in the config', () => {
-      state.maxWidth = 200;
+      config.maxWidth = 200;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.maxWidth).toEqual('200px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.maxWidth).toBe('200px');
     });
 
 
     it('should apply the max height set in the config', () => {
-      state.maxHeight = 500;
+      config.maxHeight = 500;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.maxHeight).toEqual('500px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.maxHeight).toBe('500px');
     });
 
     it('should support zero widths and heights', () => {
-      state.width = 0;
-      state.height = 0;
+      config.width = 0;
+      config.height = 0;
 
-      overlay.create(state).attach(componentPortal);
-      const pane = overlayContainerElement.children[0] as HTMLElement;
-      expect(pane.style.width).toEqual('0px');
-      expect(pane.style.height).toEqual('0px');
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      expect(overlayRef.overlayElement.style.width).toBe('0px');
+      expect(overlayRef.overlayElement.style.height).toBe('0px');
     });
+
+    it('should be able to reset the various size properties', () => {
+      config.minWidth = config.minHeight = 100;
+      config.width = config.height = 200;
+      config.maxWidth = config.maxHeight = 300;
+
+      const overlayRef = overlay.create(config);
+      overlayRef.attach(componentPortal);
+      const style = overlayRef.overlayElement.style;
+
+      expect(style.minWidth).toBe('100px');
+      expect(style.minHeight).toBe('100px');
+      expect(style.width).toBe('200px');
+      expect(style.height).toBe('200px');
+      expect(style.maxWidth).toBe('300px');
+      expect(style.maxHeight).toBe('300px');
+
+      overlayRef.updateSize({
+        minWidth: '',
+        minHeight: '',
+        width: '',
+        height: '',
+        maxWidth: '',
+        maxHeight: ''
+      });
+
+      overlayRef.updatePosition();
+
+      expect(style.minWidth).toBeFalsy();
+      expect(style.minHeight).toBeFalsy();
+      expect(style.width).toBeFalsy();
+      expect(style.height).toBeFalsy();
+      expect(style.maxWidth).toBeFalsy();
+      expect(style.maxHeight).toBeFalsy();
+    });
+
   });
 
   describe('backdrop', () => {
-    let config: OverlayState;
+    let config: OverlayConfig;
 
     beforeEach(() => {
-      config = new OverlayState();
+      config = new OverlayConfig();
       config.hasBackdrop = true;
     });
 
@@ -340,7 +525,7 @@ describe('Overlay', () => {
       overlayRef.backdropClick().subscribe(backdropClickHandler);
 
       backdrop.click();
-      expect(backdropClickHandler).toHaveBeenCalled();
+      expect(backdropClickHandler).toHaveBeenCalledWith(jasmine.any(MouseEvent));
     });
 
     it('should complete the backdrop click stream once the overlay is destroyed', () => {
@@ -366,7 +551,7 @@ describe('Overlay', () => {
       expect(backdrop.classList).toContain('cdk-overlay-dark-backdrop');
     });
 
-    it('should apply a custom overlay backdrop class', () => {
+    it('should apply a custom class to the backdrop', () => {
       config.backdropClass = 'cdk-overlay-transparent-backdrop';
 
       let overlayRef = overlay.create(config);
@@ -375,6 +560,18 @@ describe('Overlay', () => {
 
       let backdrop = overlayContainerElement.querySelector('.cdk-overlay-backdrop') as HTMLElement;
       expect(backdrop.classList).toContain('cdk-overlay-transparent-backdrop');
+    });
+
+    it('should apply multiple custom classes to the overlay', () => {
+      config.backdropClass = ['custom-class-1', 'custom-class-2'];
+
+      let overlayRef = overlay.create(config);
+      overlayRef.attach(componentPortal);
+      viewContainerFixture.detectChanges();
+
+      let backdrop = overlayContainerElement.querySelector('.cdk-overlay-backdrop') as HTMLElement;
+      expect(backdrop.classList).toContain('custom-class-1');
+      expect(backdrop.classList).toContain('custom-class-2');
     });
 
     it('should disable the pointer events of a backdrop that is being removed', () => {
@@ -391,27 +588,27 @@ describe('Overlay', () => {
       expect(backdrop.style.pointerEvents).toBe('none');
     });
 
-    it('should insert the backdrop before the overlay pane in the DOM order', () => {
-      let overlayRef = overlay.create(config);
-      overlayRef.attach(componentPortal);
+    it('should insert the backdrop before the overlay host in the DOM order', () => {
+      const overlayRef = overlay.create(config);
 
+      overlayRef.attach(componentPortal);
       viewContainerFixture.detectChanges();
 
-      let backdrop = overlayContainerElement.querySelector('.cdk-overlay-backdrop');
-      let pane = overlayContainerElement.querySelector('.cdk-overlay-pane');
-      let children = Array.prototype.slice.call(overlayContainerElement.children);
+      const backdrop = overlayContainerElement.querySelector('.cdk-overlay-backdrop');
+      const host = overlayContainerElement.querySelector('.cdk-overlay-pane')!.parentElement!;
+      const children = Array.prototype.slice.call(overlayContainerElement.children);
 
       expect(children.indexOf(backdrop)).toBeGreaterThan(-1);
-      expect(children.indexOf(pane)).toBeGreaterThan(-1);
+      expect(children.indexOf(host)).toBeGreaterThan(-1);
       expect(children.indexOf(backdrop))
-        .toBeLessThan(children.indexOf(pane), 'Expected backdrop to be before the pane in the DOM');
+        .toBeLessThan(children.indexOf(host), 'Expected backdrop to be before the host in the DOM');
     });
 
   });
 
   describe('panelClass', () => {
     it('should apply a custom overlay pane class', () => {
-      const config = new OverlayState({panelClass: 'custom-panel-class'});
+      const config = new OverlayConfig({panelClass: 'custom-panel-class'});
 
       overlay.create(config).attach(componentPortal);
       viewContainerFixture.detectChanges();
@@ -421,7 +618,7 @@ describe('Overlay', () => {
     });
 
     it('should be able to apply multiple classes', () => {
-      const config = new OverlayState({panelClass: ['custom-class-one', 'custom-class-two']});
+      const config = new OverlayConfig({panelClass: ['custom-class-one', 'custom-class-two']});
 
       overlay.create(config).attach(componentPortal);
       viewContainerFixture.detectChanges();
@@ -431,16 +628,36 @@ describe('Overlay', () => {
       expect(pane.classList).toContain('custom-class-one');
       expect(pane.classList).toContain('custom-class-two');
     });
+
+    it('should remove the custom panel class when the overlay is detached', () => {
+      const config = new OverlayConfig({panelClass: 'custom-panel-class'});
+      const overlayRef = overlay.create(config);
+
+      overlayRef.attach(componentPortal);
+      viewContainerFixture.detectChanges();
+
+      const pane = overlayContainerElement.querySelector('.cdk-overlay-pane') as HTMLElement;
+      expect(pane.classList).toContain('custom-panel-class');
+
+      overlayRef.detach();
+      viewContainerFixture.detectChanges();
+      expect(pane.classList).not.toContain('custom-panel-class');
+
+      overlayRef.attach(componentPortal);
+      viewContainerFixture.detectChanges();
+      expect(pane.classList).toContain('custom-panel-class');
+    });
+
   });
 
   describe('scroll strategy', () => {
     let fakeScrollStrategy: FakeScrollStrategy;
-    let config: OverlayState;
+    let config: OverlayConfig;
     let overlayRef: OverlayRef;
 
     beforeEach(() => {
       fakeScrollStrategy = new FakeScrollStrategy();
-      config = new OverlayState({scrollStrategy: fakeScrollStrategy});
+      config = new OverlayConfig({scrollStrategy: fakeScrollStrategy});
       overlayRef = overlay.create(config);
     });
 
@@ -469,44 +686,6 @@ describe('Overlay', () => {
   });
 });
 
-describe('OverlayContainer theming', () => {
-  let overlayContainer: OverlayContainer;
-  let overlayContainerElement: HTMLElement;
-
-  beforeEach(async(() => {
-    TestBed.configureTestingModule({ imports: [OverlayContainerThemingTestModule] });
-    TestBed.compileComponents();
-  }));
-
-  beforeEach(inject([OverlayContainer], (o: OverlayContainer) => {
-    overlayContainer = o;
-    overlayContainerElement = overlayContainer.getContainerElement();
-  }));
-
-  afterEach(() => {
-    overlayContainerElement.parentNode!.removeChild(overlayContainerElement);
-  });
-
-  it('should be able to set a theme on the overlay container', () => {
-    overlayContainer.themeClass = 'my-theme';
-    expect(overlayContainerElement.classList).toContain('my-theme');
-  });
-
-  it('should clear any previously-set themes when a new theme is set', () => {
-    overlayContainer.themeClass = 'initial-theme';
-    expect(overlayContainerElement.classList).toContain('initial-theme');
-
-    overlayContainer.themeClass = 'new-theme';
-    expect(overlayContainerElement.classList).not.toContain('initial-theme');
-    expect(overlayContainerElement.classList).toContain('new-theme');
-  });
-
-  it('should not throw when switching from a blank theme', () => {
-    overlayContainer.themeClass = '';
-    expect(() => overlayContainer.themeClass = 'new-theme').not.toThrow();
-  });
-});
-
 /** Simple component for testing ComponentPortal. */
 @Component({
   selector: 'pizza',
@@ -518,7 +697,7 @@ class PizzaMsg { }
 /** Test-bed component that contains a TempatePortal and an ElementRef. */
 @Component({template: `<ng-template cdk-portal>Cake</ng-template>`})
 class TestComponentWithTemplatePortals {
-  @ViewChild(TemplatePortalDirective) templatePortal: TemplatePortalDirective;
+  @ViewChild(CdkPortal) templatePortal: CdkPortal;
 
   constructor(public viewContainerRef: ViewContainerRef) { }
 }
@@ -533,12 +712,6 @@ const TEST_COMPONENTS = [PizzaMsg, TestComponentWithTemplatePortals];
   entryComponents: TEST_COMPONENTS,
 })
 class OverlayTestModule { }
-
-/** Component for testing the overlay container theming. */
-@NgModule({
-  imports: [OverlayModule, PortalModule],
-})
-class OverlayContainerThemingTestModule { }
 
 class FakePositionStrategy implements PositionStrategy {
   element: HTMLElement;

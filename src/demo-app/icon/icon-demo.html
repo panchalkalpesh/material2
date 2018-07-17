@@ -4,32 +4,61 @@
   </p>
 
   <p>
-    By name registered with MdIconProvider:
-    <md-icon svgIcon="thumb-up" class="green"></md-icon>
-    <md-icon svgIcon="thumb-up"></md-icon>
+    By name registered with MatIconProvider:
+    <mat-icon svgIcon="thumb-up" class="demo-icon-green"></mat-icon>
+    <mat-icon svgIcon="thumb-up"></mat-icon>
+  </p>
+
+  <p>
+    From inline template with MatIconProvider:
+    <mat-icon svgIcon="bike" class="green"></mat-icon>
+    <mat-icon svgIcon="bike"></mat-icon>
+  </p>
+
+  <p>
+    Mirrored in RTL:
+    <mat-icon class="mat-icon-rtl-mirror green" svgIcon="thumb-up"></mat-icon>
+    <mat-icon class="mat-icon-rtl-mirror" svgIcon="thumb-up"></mat-icon>
+    <mat-icon class="mat-icon-rtl-mirror green" svgIcon="bike"></mat-icon>
+    <mat-icon class="mat-icon-rtl-mirror" svgIcon="bike"></mat-icon>
   </p>
 
   <p>
     From icon set:
-    <md-icon svgIcon="core:alarm"></md-icon>
-    <md-icon svgIcon="core:accessibility"></md-icon>
-    <md-icon svgIcon="core:alarm"></md-icon>
+    <mat-icon svgIcon="core:alarm"></mat-icon>
+    <mat-icon svgIcon="core:accessibility"></mat-icon>
+    <mat-icon svgIcon="core:alarm"></mat-icon>
+  </p>
+
+  <p>
+    From inline icon set:
+    <mat-icon svgIcon="core-inline:account-balance"></mat-icon>
+    <mat-icon svgIcon="core-inline:account-balance-wallet"></mat-icon>
+    <mat-icon svgIcon="core-inline:account-box"></mat-icon>
   </p>
 
   <p>
     Ligature from Material Icons font:
-    <md-icon>home</md-icon>
+    <mat-icon>home</mat-icon>
   </p>
 
   <p>
     Using a theme:
-    <md-icon color="primary">home</md-icon>
-    <md-icon color="accent">home</md-icon>
-    <md-icon color="warn">home</md-icon>
+    <mat-icon color="primary">home</mat-icon>
+    <mat-icon color="accent">home</mat-icon>
+    <mat-icon color="warn">home</mat-icon>
   </p>
 
   <p>
     Custom icon font and CSS:
-    <md-icon fontSet="fontawesome" fontIcon="fa-birthday-cake"></md-icon>
+    <mat-icon fontSet="fontawesome" fontIcon="fa-birthday-cake"></mat-icon>
+  </p>
+
+  <span>Inline styling allows icons to appear as the same size as text around them.</span>
+  <p>
+    My <span class="cdk-visually-hidden">dog</span><mat-icon inline="true">pets</mat-icon> is my
+    <span class="cdk-visually-hidden">favorite</span><mat-icon inline="true">favorite</mat-icon>,
+    he loves to go on <span class="cdk-visually-hidden">walks</span>
+    <mat-icon inline="true">directions_walk</mat-icon>
   </p>
 </div>

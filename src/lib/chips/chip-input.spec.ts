@@ -1,28 +1,26 @@
-import {async, TestBed, ComponentFixture} from '@angular/core/testing';
-import {MdChipsModule} from './index';
-import {Component, DebugElement} from '@angular/core';
-import {PlatformModule} from '../core/platform/index';
-import {MdChipInput, MdChipInputEvent} from './chip-input';
-import {By} from '@angular/platform-browser';
-import {Directionality} from '@angular/material/core';
+import {Directionality} from '@angular/cdk/bidi';
+import {ENTER, COMMA} from '@angular/cdk/keycodes';
+import {PlatformModule} from '@angular/cdk/platform';
 import {createKeyboardEvent} from '@angular/cdk/testing';
+import {Component, DebugElement} from '@angular/core';
+import {async, ComponentFixture, TestBed} from '@angular/core/testing';
+import {By} from '@angular/platform-browser';
+import {MatChipInput, MatChipInputEvent} from './chip-input';
+import {MatChipsModule} from './index';
+import {MAT_CHIPS_DEFAULT_OPTIONS, MatChipsDefaultOptions} from './chip-default-options';
 
-import {ENTER} from '@angular/material/core';
 
-const COMMA = 188;
-
-describe('MdChipInput', () => {
+describe('MatChipInput', () => {
   let fixture: ComponentFixture<any>;
   let testChipInput: TestChipInput;
   let inputDebugElement: DebugElement;
   let inputNativeElement: HTMLElement;
-  let chipInputDirective: MdChipInput;
-
+  let chipInputDirective: MatChipInput;
   let dir = 'ltr';
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdChipsModule, PlatformModule],
+      imports: [MatChipsModule, PlatformModule],
       declarations: [TestChipInput],
       providers: [{
         provide: Directionality, useFactory: () => {
@@ -39,19 +37,32 @@ describe('MdChipInput', () => {
     testChipInput = fixture.debugElement.componentInstance;
     fixture.detectChanges();
 
-    inputDebugElement = fixture.debugElement.query(By.directive(MdChipInput));
-    chipInputDirective = inputDebugElement.injector.get(MdChipInput) as MdChipInput;
+    inputDebugElement = fixture.debugElement.query(By.directive(MatChipInput));
+    chipInputDirective = inputDebugElement.injector.get(MatChipInput) as MatChipInput;
     inputNativeElement = inputDebugElement.nativeElement;
   }));
 
   describe('basic behavior', () => {
     it('emits the (chipEnd) on enter keyup', () => {
-      let ENTER_EVENT = createKeyboardEvent('keydown', ENTER, inputNativeElement) as any;
+      let ENTER_EVENT = createKeyboardEvent('keydown', ENTER, inputNativeElement);
 
       spyOn(testChipInput, 'add');
 
       chipInputDirective._keydown(ENTER_EVENT);
       expect(testChipInput.add).toHaveBeenCalled();
+    });
+
+    it('should have a default id', () => {
+      expect(inputNativeElement.getAttribute('id')).toBeTruthy();
+    });
+
+    it('should allow binding to the `placeholder` input', () => {
+      expect(inputNativeElement.hasAttribute('placeholder')).toBe(false);
+
+      testChipInput.placeholder = 'bound placeholder';
+      fixture.detectChanges();
+
+      expect(inputNativeElement.getAttribute('placeholder')).toBe('bound placeholder');
     });
   });
 
@@ -77,12 +88,12 @@ describe('MdChipInput', () => {
     });
   });
 
-  describe('[separatorKeysCodes]', () => {
+  describe('[separatorKeyCodes]', () => {
     it('does not emit (chipEnd) when a non-separator key is pressed', () => {
-      let ENTER_EVENT = createKeyboardEvent('keydown', ENTER, inputNativeElement) as any;
+      let ENTER_EVENT = createKeyboardEvent('keydown', ENTER, inputNativeElement);
       spyOn(testChipInput, 'add');
 
-      testChipInput.separatorKeys = [COMMA];
+      chipInputDirective.separatorKeyCodes = [COMMA];
       fixture.detectChanges();
 
       chipInputDirective._keydown(ENTER_EVENT);
@@ -90,32 +101,63 @@ describe('MdChipInput', () => {
     });
 
     it('emits (chipEnd) when a custom separator keys is pressed', () => {
-      let COMMA_EVENT = createKeyboardEvent('keydown', COMMA, inputNativeElement) as any;
+      let COMMA_EVENT = createKeyboardEvent('keydown', COMMA, inputNativeElement);
       spyOn(testChipInput, 'add');
 
-      testChipInput.separatorKeys = [COMMA];
+      chipInputDirective.separatorKeyCodes = [COMMA];
       fixture.detectChanges();
 
       chipInputDirective._keydown(COMMA_EVENT);
       expect(testChipInput.add).toHaveBeenCalled();
     });
+
+    it('emits (chipEnd) when the separator keys are configured globally', () => {
+      fixture.destroy();
+
+      TestBed
+        .resetTestingModule()
+        .configureTestingModule({
+          imports: [MatChipsModule, PlatformModule],
+          declarations: [TestChipInput],
+          providers: [{
+            provide: MAT_CHIPS_DEFAULT_OPTIONS,
+            useValue: ({separatorKeyCodes: [COMMA]} as MatChipsDefaultOptions)
+          }]
+        })
+        .compileComponents();
+
+      fixture = TestBed.createComponent(TestChipInput);
+      testChipInput = fixture.debugElement.componentInstance;
+      fixture.detectChanges();
+
+      inputDebugElement = fixture.debugElement.query(By.directive(MatChipInput));
+      chipInputDirective = inputDebugElement.injector.get(MatChipInput) as MatChipInput;
+      inputNativeElement = inputDebugElement.nativeElement;
+
+      spyOn(testChipInput, 'add');
+      fixture.detectChanges();
+
+      chipInputDirective._keydown(createKeyboardEvent('keydown', COMMA, inputNativeElement));
+      expect(testChipInput.add).toHaveBeenCalled();
+    });
+
   });
 });
 
 @Component({
   template: `
-    <md-chip-list #chipList>
-    </md-chip-list>
-    <input mdInput [mdChipInputFor]="chipList"
-              [mdChipInputAddOnBlur]="addOnBlur"
-              [mdChipInputSeparatorKeyCodes]="separatorKeys"
-              (mdChipInputTokenEnd)="add($event)" />
+    <mat-chip-list #chipList>
+    </mat-chip-list>
+    <input matInput [matChipInputFor]="chipList"
+              [matChipInputAddOnBlur]="addOnBlur"
+              (matChipInputTokenEnd)="add($event)"
+              [placeholder]="placeholder" />
   `
 })
 class TestChipInput {
   addOnBlur: boolean = false;
-  separatorKeys: number[] = [ENTER];
+  placeholder = '';
 
-  add(_: MdChipInputEvent) {
+  add(_: MatChipInputEvent) {
   }
 }

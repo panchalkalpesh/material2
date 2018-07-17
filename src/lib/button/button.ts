@@ -1,115 +1,61 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {FocusMonitor} from '@angular/cdk/a11y';
+import {Platform} from '@angular/cdk/platform';
 import {
   ChangeDetectionStrategy,
   Component,
-  Directive,
   ElementRef,
-  forwardRef,
-  Inject,
   OnDestroy,
-  Optional,
-  Renderer2,
-  Self,
+  ViewChild,
   ViewEncapsulation,
+  Optional,
+  Inject,
+  Input,
 } from '@angular/core';
-import {Platform} from '@angular/cdk/platform';
 import {
   CanColor,
   CanDisable,
   CanDisableRipple,
+  MatRipple,
   mixinColor,
   mixinDisabled,
   mixinDisableRipple
 } from '@angular/material/core';
-import {FocusMonitor} from '@angular/cdk/a11y';
+import {ANIMATION_MODULE_TYPE} from '@angular/platform-browser/animations';
 
-
-// TODO(kara): Convert attribute selectors to classes when attr maps become available
-
-/** Default color palette for round buttons (md-fab and md-mini-fab) */
+/** Default color palette for round buttons (mat-fab and mat-mini-fab) */
 const DEFAULT_ROUND_BUTTON_COLOR = 'accent';
 
+/** Default color palette for flat buttons (mat-flat-button) */
+const DEFAULT_FLAT_BUTTON_COLOR = 'primary';
 
 /**
- * Directive whose purpose is to add the mat- CSS styling to this selector.
- * @docs-private
+ * List of classes to add to MatButton instances based on host attributes to
+ * style as different variants.
  */
-@Directive({
-  selector: 'button[md-button], button[mat-button], a[md-button], a[mat-button]',
-  host: {'class': 'mat-button'}
-})
-export class MdButtonCssMatStyler {}
+const BUTTON_HOST_ATTRIBUTES = [
+  'mat-button',
+  'mat-flat-button',
+  'mat-icon-button',
+  'mat-raised-button',
+  'mat-stroked-button',
+  'mat-mini-fab',
+  'mat-fab',
+];
 
-/**
- * Directive whose purpose is to add the mat- CSS styling to this selector.
- * @docs-private
- */
-@Directive({
-  selector:
-      'button[md-raised-button], button[mat-raised-button], ' +
-      'a[md-raised-button], a[mat-raised-button]',
-  host: {'class': 'mat-raised-button'}
-})
-export class MdRaisedButtonCssMatStyler {}
-
-/**
- * Directive whose purpose is to add the mat- CSS styling to this selector.
- * @docs-private
- */
-@Directive({
-  selector:
-      'button[md-icon-button], button[mat-icon-button], a[md-icon-button], a[mat-icon-button]',
-  host: {'class': 'mat-icon-button'}
-})
-export class MdIconButtonCssMatStyler {}
-
-/**
- * Directive whose purpose is to add the mat- CSS styling to this selector.
- * @docs-private
- */
-@Directive({
-  selector: 'button[md-fab], button[mat-fab], a[md-fab], a[mat-fab]',
-  host: {'class': 'mat-fab'}
-})
-export class MdFab {
-  constructor(@Self() @Optional() @Inject(forwardRef(() => MdButton)) button: MdButton,
-              @Self() @Optional() @Inject(forwardRef(() => MdAnchor)) anchor: MdAnchor) {
-    // Set the default color palette for the md-fab components.
-    (button || anchor).color = DEFAULT_ROUND_BUTTON_COLOR;
-  }
-}
-
-/**
- * Directive that targets mini-fab buttons and anchors. It's used to apply the `mat-` class
- * to all mini-fab buttons and also is responsible for setting the default color palette.
- * @docs-private
- */
-@Directive({
-  selector: 'button[md-mini-fab], button[mat-mini-fab], a[md-mini-fab], a[mat-mini-fab]',
-  host: {'class': 'mat-mini-fab'}
-})
-export class MdMiniFab {
-  constructor(@Self() @Optional() @Inject(forwardRef(() => MdButton)) button: MdButton,
-              @Self() @Optional() @Inject(forwardRef(() => MdAnchor)) anchor: MdAnchor) {
-    // Set the default color palette for the md-mini-fab components.
-    (button || anchor).color = DEFAULT_ROUND_BUTTON_COLOR;
-  }
-}
-
-
-// Boilerplate for applying mixins to MdButton.
+// Boilerplate for applying mixins to MatButton.
 /** @docs-private */
-export class MdButtonBase {
-  constructor(public _renderer: Renderer2, public _elementRef: ElementRef) {}
+export class MatButtonBase {
+  constructor(public _elementRef: ElementRef) {}
 }
-export const _MdButtonMixinBase = mixinColor(mixinDisabled(mixinDisableRipple(MdButtonBase)));
+export const _MatButtonMixinBase = mixinColor(mixinDisabled(mixinDisableRipple(MatButtonBase)));
 
 
 /**
@@ -117,12 +63,13 @@ export const _MdButtonMixinBase = mixinColor(mixinDisabled(mixinDisableRipple(Md
  */
 @Component({
   moduleId: module.id,
-  selector: `button[md-button], button[md-raised-button], button[md-icon-button],
-             button[md-fab], button[md-mini-fab],
-             button[mat-button], button[mat-raised-button], button[mat-icon-button],
-             button[mat-fab], button[mat-mini-fab]`,
+  selector: `button[mat-button], button[mat-raised-button], button[mat-icon-button],
+             button[mat-fab], button[mat-mini-fab], button[mat-stroked-button],
+             button[mat-flat-button]`,
+  exportAs: 'matButton',
   host: {
     '[disabled]': 'disabled || null',
+    '[class._mat-animation-noopable]': '_animationMode === "NoopAnimations"',
   },
   templateUrl: 'button.html',
   styleUrls: ['button.css'],
@@ -130,21 +77,45 @@ export const _MdButtonMixinBase = mixinColor(mixinDisabled(mixinDisableRipple(Md
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdButton extends _MdButtonMixinBase
+export class MatButton extends _MatButtonMixinBase
     implements OnDestroy, CanDisable, CanColor, CanDisableRipple {
 
   /** Whether the button is round. */
-  _isRoundButton: boolean = this._hasAttributeWithPrefix('fab', 'mini-fab');
+  readonly isRoundButton: boolean = this._hasHostAttributes('mat-fab', 'mat-mini-fab');
 
   /** Whether the button is icon button. */
-  _isIconButton: boolean = this._hasAttributeWithPrefix('icon-button');
+  readonly isIconButton: boolean = this._hasHostAttributes('mat-icon-button');
 
-  constructor(renderer: Renderer2,
-              elementRef: ElementRef,
+  /** Reference to the MatRipple instance of the button. */
+  @ViewChild(MatRipple) ripple: MatRipple;
+
+  constructor(elementRef: ElementRef,
+              /**
+               * @deprecated Platform checks for SSR are no longer needed
+               * @deletion-target 7.0.0
+               */
+              // tslint:disable-next-line:no-unused-variable
               private _platform: Platform,
-              private _focusMonitor: FocusMonitor) {
-    super(renderer, elementRef);
-    this._focusMonitor.monitor(this._elementRef.nativeElement, this._renderer, true);
+              private _focusMonitor: FocusMonitor,
+              // @deletion-target 7.0.0 `_animationMode` parameter to be made required.
+              @Optional() @Inject(ANIMATION_MODULE_TYPE) public _animationMode?: string) {
+    super(elementRef);
+
+    // For each of the variant selectors that is prevent in the button's host
+    // attributes, add the correct corresponding class.
+    for (const attr of BUTTON_HOST_ATTRIBUTES) {
+      if (this._hasHostAttributes(attr)) {
+        (elementRef.nativeElement as HTMLElement).classList.add(attr);
+      }
+    }
+
+    this._focusMonitor.monitor(this._elementRef.nativeElement, true);
+
+    if (this.isRoundButton) {
+      this.color = DEFAULT_ROUND_BUTTON_COLOR;
+    } else if (this._hasHostAttributes('mat-flat-button')) {
+      this.color = DEFAULT_FLAT_BUTTON_COLOR;
+    }
   }
 
   ngOnDestroy() {
@@ -164,23 +135,9 @@ export class MdButton extends _MdButtonMixinBase
     return this.disableRipple || this.disabled;
   }
 
-  /**
-   * Gets whether the button has one of the given attributes
-   * with either an 'md-' or 'mat-' prefix.
-   */
-  _hasAttributeWithPrefix(...unprefixedAttributeNames: string[]) {
-    // If not on the browser, say that there are none of the attributes present.
-    // Since these only affect how the ripple displays (and ripples only happen on the client),
-    // detecting these attributes isn't necessary when not on the browser.
-    if (!this._platform.isBrowser) {
-      return false;
-    }
-
-    return unprefixedAttributeNames.some(suffix => {
-      const el = this._getHostElement();
-
-      return el.hasAttribute('md-' + suffix) || el.hasAttribute('mat-' + suffix);
-    });
+  /** Gets whether the button has one of the given attributes. */
+  _hasHostAttributes(...attributes: string[]) {
+    return attributes.some(attribute => this._getHostElement().hasAttribute(attribute));
   }
 }
 
@@ -189,13 +146,18 @@ export class MdButton extends _MdButtonMixinBase
  */
 @Component({
   moduleId: module.id,
-  selector: `a[md-button], a[md-raised-button], a[md-icon-button], a[md-fab], a[md-mini-fab],
-             a[mat-button], a[mat-raised-button], a[mat-icon-button], a[mat-fab], a[mat-mini-fab]`,
+  selector: `a[mat-button], a[mat-raised-button], a[mat-icon-button], a[mat-fab],
+             a[mat-mini-fab], a[mat-stroked-button], a[mat-flat-button]`,
+  exportAs: 'matButton, matAnchor',
   host: {
-    '[attr.tabindex]': 'disabled ? -1 : 0',
+    // Note that we ignore the user-specified tabindex when it's disabled for
+    // consistency with the `mat-button` applied on native buttons where even
+    // though they have an index, they're not tabbable.
+    '[attr.tabindex]': 'disabled ? -1 : (tabIndex || 0)',
     '[attr.disabled]': 'disabled || null',
     '[attr.aria-disabled]': 'disabled.toString()',
     '(click)': '_haltDisabledEvents($event)',
+    '[class._mat-animation-noopable]': '_animationMode === "NoopAnimations"',
   },
   inputs: ['disabled', 'disableRipple', 'color'],
   templateUrl: 'button.html',
@@ -203,13 +165,17 @@ export class MdButton extends _MdButtonMixinBase
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdAnchor extends MdButton {
+export class MatAnchor extends MatButton {
+  /** Tabindex of the button. */
+  @Input() tabIndex: number;
+
   constructor(
-      platform: Platform,
-      focusMonitor: FocusMonitor,
-      elementRef: ElementRef,
-      renderer: Renderer2) {
-    super(renderer, elementRef, platform, focusMonitor);
+    platform: Platform,
+    focusMonitor: FocusMonitor,
+    elementRef: ElementRef,
+    // @deletion-target 7.0.0 `animationMode` parameter to be made required.
+    @Optional() @Inject(ANIMATION_MODULE_TYPE) animationMode?: string) {
+    super(elementRef, platform, focusMonitor, animationMode);
   }
 
   _haltDisabledEvents(event: Event) {

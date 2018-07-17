@@ -1,18 +1,24 @@
 import {TestBed, async, ComponentFixture} from '@angular/core/testing';
 import {Component} from '@angular/core';
 import {By} from '@angular/platform-browser';
-import {MdProgressBarModule} from './index';
+import {Location} from '@angular/common';
+import {MatProgressBarModule} from './index';
 
 
-describe('MdProgressBar', () => {
+describe('MatProgressBar', () => {
+  let fakePath = '/fake-path';
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdProgressBarModule],
+      imports: [MatProgressBarModule],
       declarations: [
         BasicProgressBar,
         BufferProgressBar,
       ],
+      providers: [{
+        provide: Location,
+        useValue: {path: () => fakePath}
+      }]
     });
 
     TestBed.compileComponents();
@@ -28,18 +34,18 @@ describe('MdProgressBar', () => {
     });
 
     it('should apply a mode of "determinate" if no mode is provided.', () => {
-      let progressElement = fixture.debugElement.query(By.css('md-progress-bar'));
+      let progressElement = fixture.debugElement.query(By.css('mat-progress-bar'));
       expect(progressElement.componentInstance.mode).toBe('determinate');
     });
 
     it('should define default values for value and bufferValue attributes', () => {
-      let progressElement = fixture.debugElement.query(By.css('md-progress-bar'));
+      let progressElement = fixture.debugElement.query(By.css('mat-progress-bar'));
       expect(progressElement.componentInstance.value).toBe(0);
       expect(progressElement.componentInstance.bufferValue).toBe(0);
     });
 
     it('should clamp value and bufferValue between 0 and 100', () => {
-      let progressElement = fixture.debugElement.query(By.css('md-progress-bar'));
+      let progressElement = fixture.debugElement.query(By.css('mat-progress-bar'));
       let progressComponent = progressElement.componentInstance;
 
       progressComponent.value = 50;
@@ -62,7 +68,7 @@ describe('MdProgressBar', () => {
     });
 
     it('should return the transform attribute for bufferValue and mode', () => {
-      let progressElement = fixture.debugElement.query(By.css('md-progress-bar'));
+      let progressElement = fixture.debugElement.query(By.css('mat-progress-bar'));
       let progressComponent = progressElement.componentInstance;
 
       expect(progressComponent._primaryTransform()).toEqual({transform: 'scaleX(0)'});
@@ -87,6 +93,16 @@ describe('MdProgressBar', () => {
       expect(progressComponent._primaryTransform()).toEqual({transform: 'scaleX(0.6)'});
       expect(progressComponent._bufferTransform()).toEqual({transform: 'scaleX(0.6)'});
     });
+
+    it('should prefix SVG references with the current path', () => {
+      const rect = fixture.debugElement.query(By.css('rect')).nativeElement;
+      expect(rect.getAttribute('fill')).toMatch(/^url\(\/fake-path#.*\)$/);
+    });
+
+    it('should not be able to tab into the underlying SVG element', () => {
+      const svg = fixture.debugElement.query(By.css('svg')).nativeElement;
+      expect(svg.getAttribute('focusable')).toBe('false');
+    });
   });
 
   describe('buffer progress-bar', () => {
@@ -98,15 +114,15 @@ describe('MdProgressBar', () => {
     });
 
     it('should not modify the mode if a valid mode is provided.', () => {
-      let progressElement = fixture.debugElement.query(By.css('md-progress-bar'));
+      let progressElement = fixture.debugElement.query(By.css('mat-progress-bar'));
       expect(progressElement.componentInstance.mode).toBe('buffer');
     });
   });
 });
 
 
-@Component({template: '<md-progress-bar></md-progress-bar>'})
+@Component({template: '<mat-progress-bar></mat-progress-bar>'})
 class BasicProgressBar { }
 
-@Component({template: '<md-progress-bar mode="buffer"></md-progress-bar>'})
+@Component({template: '<mat-progress-bar mode="buffer"></mat-progress-bar>'})
 class BufferProgressBar { }

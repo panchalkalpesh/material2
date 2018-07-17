@@ -18,8 +18,12 @@ const htmlMinifierOptions = {
   removeAttributeQuotes: false
 };
 
-/** Creates a set of gulp tasks that can build the specified package. */
-export function createPackageBuildTasks(buildPackage: BuildPackage) {
+/**
+ * Creates a set of gulp tasks that can build the specified package.
+ * @param buildPackage Build package for which the gulp tasks will be generated
+ * @param preBuildTasks List of gulp tasks that should run before building the package.
+ */
+export function createPackageBuildTasks(buildPackage: BuildPackage, preBuildTasks: string[] = []) {
   // Name of the package build tasks for Gulp.
   const taskName = buildPackage.name;
 
@@ -42,21 +46,25 @@ export function createPackageBuildTasks(buildPackage: BuildPackage) {
   task(`${taskName}:clean-build`, sequenceTask('clean', `${taskName}:build`));
 
   task(`${taskName}:build`, sequenceTask(
+    // Run the pre build gulp tasks.
+    ...preBuildTasks,
     // Build all required packages before building.
     ...dependencyNames.map(pkgName => `${pkgName}:build`),
     // Build ESM and assets output.
-    [`${taskName}:build:esm`, `${taskName}:assets`],
+    `${taskName}:assets`,
+    `${taskName}:build:esm`,
     // Inline assets into ESM output.
     `${taskName}:assets:inline`,
     // Build bundles on top of inlined ESM output.
     `${taskName}:build:bundles`,
   ));
 
-  task(`${taskName}:build-tests`, sequenceTask(
-    // Build all required tests before building.
-    ...dependencyNames.map(pkgName => `${pkgName}:build-tests`),
+  task(`${taskName}:build-no-bundles`, sequenceTask(
+    // Build assets before building the ESM output. Since we compile with NGC, the compiler
+    // tries to resolve all required assets.
+    `${taskName}:assets`,
     // Build the ESM output that includes all test files. Also build assets for the package.
-    [`${taskName}:build:esm:tests`, `${taskName}:assets`],
+    `${taskName}:build:esm:tests`,
     // Inline assets into ESM output.
     `${taskName}:assets:inline`
   ));
@@ -78,10 +86,11 @@ export function createPackageBuildTasks(buildPackage: BuildPackage) {
   task(`${taskName}:build:bundles`, () => buildPackage.createBundles());
 
   /**
-   * Asset tasks. Building SASS files and inlining CSS, HTML files into the ESM output.
+   * Asset tasks. Building Sass files and inlining CSS, HTML files into the ESM output.
    */
   task(`${taskName}:assets`, [
     `${taskName}:assets:scss`,
+    `${taskName}:assets:es5-scss`,
     `${taskName}:assets:copy-styles`,
     `${taskName}:assets:html`
   ]);
@@ -90,11 +99,19 @@ export function createPackageBuildTasks(buildPackage: BuildPackage) {
     buildPackage.outputDir, buildPackage.sourceDir, true)
   );
 
+  task(`${taskName}:assets:es5-scss`, buildScssTask(
+      buildPackage.esm5OutputDir, buildPackage.sourceDir, true)
+  );
+
   task(`${taskName}:assets:copy-styles`, () => {
-    return src(stylesGlob).pipe(dest(buildPackage.outputDir));
+    return src(stylesGlob)
+        .pipe(dest(buildPackage.outputDir))
+        .pipe(dest(buildPackage.esm5OutputDir));
   });
   task(`${taskName}:assets:html`, () => {
-    return src(htmlGlob).pipe(htmlmin(htmlMinifierOptions)).pipe(dest(buildPackage.outputDir));
+    return src(htmlGlob).pipe(htmlmin(htmlMinifierOptions))
+        .pipe(dest(buildPackage.outputDir))
+        .pipe(dest(buildPackage.esm5OutputDir));
   });
 
   task(`${taskName}:assets:inline`, () => inlineResourcesForDirectory(buildPackage.outputDir));

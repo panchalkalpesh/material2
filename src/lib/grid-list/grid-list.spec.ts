@@ -1,14 +1,15 @@
 import {async, TestBed} from '@angular/core/testing';
 import {Component, DebugElement} from '@angular/core';
 import {By} from '@angular/platform-browser';
-import {MdGridList, MdGridListModule} from './index';
-import {MdGridTile, MdGridTileText} from './grid-tile';
+import {MatGridList, MatGridListModule} from './index';
+import {MatGridTile, MatGridTileText} from './grid-tile';
+import {Directionality} from '@angular/cdk/bidi';
 
 
-describe('MdGridList', () => {
+describe('MatGridList', () => {
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [MdGridListModule],
+      imports: [MatGridListModule],
       declarations: [
         GridListWithoutCols,
         GridListWithInvalidRowHeightRatio,
@@ -28,6 +29,9 @@ describe('MdGridList', () => {
         GridListWithComplexLayout,
         GridListWithFootersWithoutLines,
         GridListWithFooterContainingTwoLines,
+        GridListWithoutMatchingGap,
+        GridListWithEmptyDirectionality,
+        GridListWithRtl,
       ],
     });
 
@@ -55,7 +59,7 @@ describe('MdGridList', () => {
   it('should default to 1:1 row height if undefined ', () => {
     let fixture = TestBed.createComponent(GridListWithUnspecifiedRowHeight);
     fixture.detectChanges();
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
 
     // In ratio mode, heights are set using the padding-top property.
     expect(getStyle(tile, 'padding-top')).toBe('200px');
@@ -67,7 +71,7 @@ describe('MdGridList', () => {
     fixture.componentInstance.rowHeight = '4:1';
     fixture.detectChanges();
 
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
     expect(getStyle(tile, 'padding-top')).toBe('100px');
 
     fixture.componentInstance.rowHeight = '2:1';
@@ -81,7 +85,7 @@ describe('MdGridList', () => {
 
     fixture.componentInstance.totalHeight = '300px';
     fixture.detectChanges();
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
 
     // 149.5 * 2 = 299px + 1px gutter = 300px
     expect(getStyle(tile, 'height')).toBe('149.5px');
@@ -99,7 +103,7 @@ describe('MdGridList', () => {
     fixture.componentInstance.rowHeight = '100px';
     fixture.detectChanges();
 
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
     expect(getStyle(tile, 'height')).toBe('100px');
 
     fixture.componentInstance.rowHeight = '200px';
@@ -112,7 +116,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithUnitlessFixedRowHeight);
     fixture.detectChanges();
 
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
     expect(getStyle(tile, 'height')).toBe('100px');
   });
 
@@ -120,7 +124,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithUnspecifiedGutterSize);
     fixture.detectChanges();
 
-    let tiles = fixture.debugElement.queryAll(By.css('md-grid-tile'));
+    let tiles = fixture.debugElement.queryAll(By.css('mat-grid-tile'));
 
     // check horizontal gutter
     expect(getStyle(tiles[0], 'width')).toBe('99.5px');
@@ -135,7 +139,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithGutterSize);
     fixture.detectChanges();
 
-    let tiles = fixture.debugElement.queryAll(By.css('md-grid-tile'));
+    let tiles = fixture.debugElement.queryAll(By.css('mat-grid-tile'));
 
     // check horizontal gutter
     expect(getStyle(tiles[0], 'width')).toBe('99px');
@@ -150,7 +154,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithUnitlessGutterSize);
     fixture.detectChanges();
 
-    let tiles = fixture.debugElement.queryAll(By.css('md-grid-tile'));
+    let tiles = fixture.debugElement.queryAll(By.css('mat-grid-tile'));
 
     // check horizontal gutter
     expect(getStyle(tiles[0], 'width')).toBe('99px');
@@ -165,7 +169,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithRatioHeightAndMulipleRows);
     fixture.detectChanges();
 
-    let list = fixture.debugElement.query(By.directive(MdGridList));
+    let list = fixture.debugElement.query(By.directive(MatGridList));
     expect(getStyle(list, 'padding-bottom')).toBe('201px');
   });
 
@@ -173,7 +177,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithFixRowHeightAndMultipleRows);
     fixture.detectChanges();
 
-    let list = fixture.debugElement.query(By.directive(MdGridList));
+    let list = fixture.debugElement.query(By.directive(MatGridList));
     expect(getStyle(list, 'height')).toBe('201px');
   });
 
@@ -182,7 +186,7 @@ describe('MdGridList', () => {
       fixture.componentInstance.colspan = 2;
       fixture.detectChanges();
 
-      let tile = fixture.debugElement.query(By.directive(MdGridTile));
+      let tile = fixture.debugElement.query(By.directive(MatGridTile));
       expect(getStyle(tile, 'width')).toBe('199.5px');
 
       fixture.componentInstance.colspan = 3;
@@ -196,7 +200,7 @@ describe('MdGridList', () => {
     fixture.componentInstance.rowspan = 2;
     fixture.detectChanges();
 
-    let tile = fixture.debugElement.query(By.directive(MdGridTile));
+    let tile = fixture.debugElement.query(By.directive(MatGridTile));
     expect(getStyle(tile, 'height')).toBe('201px');
 
     fixture.componentInstance.rowspan = 3;
@@ -215,7 +219,7 @@ describe('MdGridList', () => {
       ];
 
       fixture.detectChanges();
-      let tiles = fixture.debugElement.queryAll(By.css('md-grid-tile'));
+      let tiles = fixture.debugElement.queryAll(By.css('mat-grid-tile'));
 
       expect(getStyle(tiles[0], 'width')).toBe('299.75px');
       expect(getStyle(tiles[0], 'height')).toBe('100px');
@@ -242,7 +246,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithFootersWithoutLines);
     fixture.detectChanges();
 
-    let footer = fixture.debugElement.query(By.directive(MdGridTileText));
+    let footer = fixture.debugElement.query(By.directive(MatGridTileText));
     expect(footer.nativeElement.classList.contains('mat-2-line')).toBe(false);
   });
 
@@ -250,7 +254,7 @@ describe('MdGridList', () => {
     let fixture = TestBed.createComponent(GridListWithFooterContainingTwoLines);
     fixture.detectChanges();
 
-    let footer = fixture.debugElement.query(By.directive(MdGridTileText));
+    let footer = fixture.debugElement.query(By.directive(MatGridTileText));
     expect(footer.nativeElement.classList.contains('mat-2-line')).toBe(true);
   });
 
@@ -260,7 +264,7 @@ describe('MdGridList', () => {
     fixture.componentInstance.rowHeight = '4:1';
     fixture.detectChanges();
 
-    const firstTile = fixture.debugElement.query(By.directive(MdGridTile)).nativeElement;
+    const firstTile = fixture.debugElement.query(By.directive(MatGridTile)).nativeElement;
 
     expect(firstTile.style.marginTop).toBe('0px');
     expect(firstTile.style.left).toBe('0px');
@@ -272,8 +276,8 @@ describe('MdGridList', () => {
     fixture.componentInstance.rowHeight = '4:1';
     fixture.detectChanges();
 
-    const list = fixture.debugElement.query(By.directive(MdGridList));
-    const tile = fixture.debugElement.query(By.directive(MdGridTile));
+    const list = fixture.debugElement.query(By.directive(MatGridList));
+    const tile = fixture.debugElement.query(By.directive(MatGridTile));
 
     expect(getStyle(tile, 'padding-top')).toBe('100px');
     expect(getStyle(list, 'padding-bottom')).toBe('100px');
@@ -287,6 +291,32 @@ describe('MdGridList', () => {
     expect(getStyle(tile, 'height')).toBe('400px');
   });
 
+  it('should ensure that all tiles are inside the grid when there are no matching gaps', () => {
+    const fixture = TestBed.createComponent(GridListWithoutMatchingGap);
+    const tiles = fixture.debugElement.queryAll(By.css('mat-grid-tile'));
+
+    fixture.detectChanges();
+    expect(tiles.every(tile => getComputedLeft(tile) >= 0))
+        .toBe(true, 'Expected none of the tiles to have a negative `left`');
+  });
+
+  it('should default to LTR if empty directionality is given', () => {
+    const fixture = TestBed.createComponent(GridListWithEmptyDirectionality);
+    const tile: HTMLElement = fixture.debugElement.query(By.css('mat-grid-tile')).nativeElement;
+    fixture.detectChanges();
+
+    expect(tile.style.left).toBe('0px');
+    expect(tile.style.right).toBe('');
+  });
+
+  it('should set `right` styles for RTL', () => {
+    const fixture = TestBed.createComponent(GridListWithRtl);
+    const tile: HTMLElement = fixture.debugElement.query(By.css('mat-grid-tile')).nativeElement;
+    fixture.detectChanges();
+
+    expect(tile.style.left).toBe('');
+    expect(tile.style.right).toBe('0px');
+  });
 });
 
 
@@ -298,7 +328,7 @@ function getStyle(el: DebugElement, prop: string): string {
 function getComputedLeft(element: DebugElement): number {
   // While the other properties in this test use `getComputedStyle`, we use `getBoundingClientRect`
   // for left because iOS Safari doesn't support using `getComputedStyle` to get the calculated
-  // `left` balue when using CSS `calc`. We subtract the `left` of the document body because
+  // `left` value when using CSS `calc`. We subtract the `left` of the document body because
   // browsers, by default, add a margin to the body (typically 8px).
   let elementRect = element.nativeElement.getBoundingClientRect();
   let bodyRect = document.body.getBoundingClientRect();
@@ -307,154 +337,175 @@ function getComputedLeft(element: DebugElement): number {
 }
 
 
-
-@Component({template: '<md-grid-list></md-grid-list>'})
+@Component({template: '<mat-grid-list></mat-grid-list>'})
 class GridListWithoutCols { }
 
-@Component({template: '<md-grid-list cols="4" rowHeight="4:3:2"></md-grid-list>'})
+@Component({template: '<mat-grid-list cols="4" rowHeight="4:3:2"></mat-grid-list>'})
 class GridListWithInvalidRowHeightRatio { }
 
 @Component({template:
-    '<md-grid-list cols="4"><md-grid-tile colspan="5"></md-grid-tile></md-grid-list>'})
+    '<mat-grid-list cols="4"><mat-grid-tile colspan="5"></mat-grid-tile></mat-grid-list>'})
 class GridListWithTooWideColspan { }
 
 @Component({template: `
     <div style="width:200px">
-      <md-grid-list cols="1">
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="1">
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithUnspecifiedRowHeight { }
 
 @Component({template: `
     <div style="width:400px">
-      <md-grid-list cols="1" [rowHeight]="rowHeight">
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="1" [rowHeight]="rowHeight">
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GirdListWithRowHeightRatio {
   rowHeight: string;
 }
 
 @Component({template: `
-    <md-grid-list cols="1" rowHeight="fit" [style.height]="totalHeight">
-      <md-grid-tile></md-grid-tile>
-      <md-grid-tile></md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="1" rowHeight="fit" [style.height]="totalHeight">
+      <mat-grid-tile></mat-grid-tile>
+      <mat-grid-tile></mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithFitRowHeightMode {
   totalHeight: string;
 }
 
 @Component({template: `
-    <md-grid-list cols="4" [rowHeight]="rowHeight">
-      <md-grid-tile></md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="4" [rowHeight]="rowHeight">
+      <mat-grid-tile></mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithFixedRowHeightMode {
   rowHeight: string;
 }
 
 @Component({template: `
-    <md-grid-list cols="4" rowHeight="100">
-      <md-grid-tile></md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="4" rowHeight="100">
+      <mat-grid-tile></mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithUnitlessFixedRowHeight {
   rowHeight: string;
 }
 
 @Component({template: `
     <div style="width:200px">
-      <md-grid-list cols="2" rowHeight="100px">
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="2" rowHeight="100px">
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithUnspecifiedGutterSize { }
 
 @Component({template: `
     <div style="width:200px">
-      <md-grid-list cols="2" gutterSize="2px" rowHeight="100px">
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="2" gutterSize="2px" rowHeight="100px">
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithGutterSize { }
 
 @Component({template: `
     <div style="width:200px">
-      <md-grid-list cols="2" gutterSize="2" rowHeight="100px">
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="2" gutterSize="2" rowHeight="100px">
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithUnitlessGutterSize { }
 
 @Component({template: `
     <div style="width:400px">
-      <md-grid-list cols="1" rowHeight="4:1">
-        <md-grid-tile></md-grid-tile>
-        <md-grid-tile></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="1" rowHeight="4:1">
+        <mat-grid-tile></mat-grid-tile>
+        <mat-grid-tile></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithRatioHeightAndMulipleRows { }
 
 @Component({template: `
-    <md-grid-list cols="1" rowHeight="100px">
-      <md-grid-tile></md-grid-tile>
-      <md-grid-tile></md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="1" rowHeight="100px">
+      <mat-grid-tile></mat-grid-tile>
+      <mat-grid-tile></mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithFixRowHeightAndMultipleRows { }
 
 @Component({template: `
     <div style="width:400px">
-      <md-grid-list cols="4">
-        <md-grid-tile [colspan]="colspan"></md-grid-tile>
-      </md-grid-list>
+      <mat-grid-list cols="4">
+        <mat-grid-tile [colspan]="colspan"></mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithColspanBinding {
   colspan: number;
 }
 
 @Component({template: `
-    <md-grid-list cols="1" rowHeight="100px">
-      <md-grid-tile [rowspan]="rowspan"></md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="1" rowHeight="100px">
+      <mat-grid-tile [rowspan]="rowspan"></mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithRowspanBinding {
   rowspan: number;
 }
 
 @Component({template: `
     <div style="width:400px">
-      <md-grid-list cols="4" rowHeight="100px">
-        <md-grid-tile *ngFor="let tile of tiles" [colspan]="tile.cols" [rowspan]="tile.rows"
+      <mat-grid-list cols="4" rowHeight="100px">
+        <mat-grid-tile *ngFor="let tile of tiles" [colspan]="tile.cols" [rowspan]="tile.rows"
                       [style.background]="tile.color">
           {{tile.text}}
-        </md-grid-tile>
-      </md-grid-list>
+        </mat-grid-tile>
+      </mat-grid-list>
     </div>`})
 class GridListWithComplexLayout {
   tiles: any[];
 }
 
 @Component({template: `
-    <md-grid-list cols="1">
-      <md-grid-tile>
-        <md-grid-tile-footer>
+    <mat-grid-list cols="1">
+      <mat-grid-tile>
+        <mat-grid-tile-footer>
           I'm a footer!
-        </md-grid-tile-footer>
-      </md-grid-tile>
-    </md-grid-list>`})
+        </mat-grid-tile-footer>
+      </mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithFootersWithoutLines { }
 
 @Component({template: `
-    <md-grid-list cols="1">
-      <md-grid-tile>
-        <md-grid-tile-footer>
-          <h3 md-line>First line</h3>
-          <span md-line>Second line</span>
-        </md-grid-tile-footer>
-      </md-grid-tile>
-    </md-grid-list>`})
+    <mat-grid-list cols="1">
+      <mat-grid-tile>
+        <mat-grid-tile-footer>
+          <h3 mat-line>First line</h3>
+          <span mat-line>Second line</span>
+        </mat-grid-tile-footer>
+      </mat-grid-tile>
+    </mat-grid-list>`})
 class GridListWithFooterContainingTwoLines { }
+
+@Component({template: `
+  <mat-grid-list cols="5">
+    <mat-grid-tile [rowspan]="1" [colspan]="3">1</mat-grid-tile>
+    <mat-grid-tile [rowspan]="2" [colspan]="2">2</mat-grid-tile>
+    <mat-grid-tile [rowspan]="1" [colspan]="2">3</mat-grid-tile>
+    <mat-grid-tile [rowspan]="2" [colspan]="2">4</mat-grid-tile>
+  </mat-grid-list>
+`})
+class GridListWithoutMatchingGap { }
+
+@Component({
+  template: `<mat-grid-list cols="1"><mat-grid-tile>Hello</mat-grid-tile></mat-grid-list>`,
+  providers: [{provide: Directionality, useValue: {}}]
+})
+class GridListWithEmptyDirectionality { }
+
+@Component({
+  template: `<mat-grid-list cols="1"><mat-grid-tile>Hello</mat-grid-tile></mat-grid-list>`,
+  providers: [{provide: Directionality, useValue: {value: 'rtl'}}]
+})
+class GridListWithRtl { }

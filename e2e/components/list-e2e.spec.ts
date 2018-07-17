@@ -1,16 +1,14 @@
 import {browser} from 'protractor';
 import {expectToExist} from '../util/index';
-import {screenshot} from '../screenshot';
 
 describe('list', () => {
   beforeEach(() => browser.get('/list'));
 
   it('should render a list container', () => {
-    expectToExist('md-list');
-    screenshot();
+    expectToExist('mat-list');
   });
 
   it('should render list items inside the list container', () => {
-    expectToExist('md-list md-list-item');
+    expectToExist('mat-list mat-list-item');
   });
 });

@@ -1,62 +1,37 @@
-<div class="mat-calendar-header">
-  <div class="mat-calendar-controls">
-    <!--
-      TODO(mmalerba): Clean up duplicated compatibility mode code when we have a better way to do
-      this.
-    -->
 
-    <!-- Check for compatibility mode and use correct prefix for md-button. -->
-    <button *ngIf="!_isCompatibilityMode" md-button class="mat-calendar-period-button"
-            (click)="_currentPeriodClicked()"  [attr.aria-label]="_periodButtonLabel">
-      {{_periodButtonText}}
-      <div class="mat-calendar-arrow" [class.mat-calendar-invert]="!_monthView"></div>
-    </button>
-    <button *ngIf="_isCompatibilityMode" mat-button class="mat-calendar-period-button"
-            (click)="_currentPeriodClicked()"  [attr.aria-label]="_periodButtonLabel">
-      {{_periodButtonText}}
-      <div class="mat-calendar-arrow" [class.mat-calendar-invert]="!_monthView"></div>
-    </button>
+<ng-template [cdkPortalOutlet]="_calendarHeaderPortal"></ng-template>
 
-    <div class="mat-calendar-spacer"></div>
-
-    <!-- Check for compatibility mode and use correct prefix for md-icon-button. -->
-    <button *ngIf="!_isCompatibilityMode" md-icon-button class="mat-calendar-previous-button"
-            [disabled]="!_previousEnabled()" (click)="_previousClicked()"
-            [attr.aria-label]="_prevButtonLabel">
-    </button>
-    <button *ngIf="_isCompatibilityMode" mat-icon-button class="mat-calendar-previous-button"
-            [disabled]="!_previousEnabled()" (click)="_previousClicked()"
-            [attr.aria-label]="_prevButtonLabel">
-    </button>
-
-    <!-- Check for compatibility mode and use correct prefix for md-icon-button. -->
-    <button *ngIf="!_isCompatibilityMode" md-icon-button class="mat-calendar-next-button"
-            [disabled]="!_nextEnabled()" (click)="_nextClicked()"
-            [attr.aria-label]="_nextButtonLabel">
-    </button>
-    <button *ngIf="_isCompatibilityMode" mat-icon-button class="mat-calendar-next-button"
-            [disabled]="!_nextEnabled()" (click)="_nextClicked()"
-            [attr.aria-label]="_nextButtonLabel">
-    </button>
-  </div>
-</div>
-
-<div class="mat-calendar-content" (keydown)="_handleCalendarBodyKeydown($event)"
-    [ngSwitch]="_monthView" cdkMonitorSubtreeFocus>
-  <md-month-view
-      *ngSwitchCase="true"
-      [activeDate]="_activeDate"
+<div class="mat-calendar-content" [ngSwitch]="currentView" cdkMonitorSubtreeFocus tabindex="-1">
+  <mat-month-view
+      *ngSwitchCase="'month'"
+      [(activeDate)]="activeDate"
       [selected]="selected"
-      [dateFilter]="_dateFilterForViews"
+      [dateFilter]="dateFilter"
+      [maxDate]="maxDate"
+      [minDate]="minDate"
       (selectedChange)="_dateSelected($event)"
-      (userSelection)="_userSelected()">
-  </md-month-view>
+      (_userSelection)="_userSelected()">
+  </mat-month-view>
 
-  <md-year-view
-      *ngSwitchDefault
-      [activeDate]="_activeDate"
+  <mat-year-view
+      *ngSwitchCase="'year'"
+      [(activeDate)]="activeDate"
       [selected]="selected"
-      [dateFilter]="_dateFilterForViews"
-      (selectedChange)="_monthSelected($event)">
-  </md-year-view>
+      [dateFilter]="dateFilter"
+      [maxDate]="maxDate"
+      [minDate]="minDate"
+      (monthSelected)="_monthSelectedInYearView($event)"
+      (selectedChange)="_goToDateInView($event, 'month')">
+  </mat-year-view>
+
+  <mat-multi-year-view
+      *ngSwitchCase="'multi-year'"
+      [(activeDate)]="activeDate"
+      [selected]="selected"
+      [dateFilter]="dateFilter"
+      [maxDate]="maxDate"
+      [minDate]="minDate"
+      (yearSelected)="_yearSelectedInMultiYearView($event)"
+      (selectedChange)="_goToDateInView($event, 'year')">
+  </mat-multi-year-view>
 </div>

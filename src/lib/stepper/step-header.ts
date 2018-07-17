@@ -1,20 +1,31 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {coerceBooleanProperty, coerceNumberProperty} from '@angular/cdk/coercion';
-import {Component, Input, ViewEncapsulation} from '@angular/core';
-import {MATERIAL_COMPATIBILITY_MODE} from '@angular/material/core';
-import {MdStepLabel} from './step-label';
+import {FocusMonitor} from '@angular/cdk/a11y';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  Input,
+  OnDestroy,
+  ViewEncapsulation,
+  TemplateRef,
+} from '@angular/core';
+import {Subscription} from 'rxjs';
+import {MatStepLabel} from './step-label';
+import {MatStepperIntl} from './stepper-intl';
+import {MatStepperIconContext} from './stepper-icon';
 
 
 @Component({
   moduleId: module.id,
-  selector: 'md-step-header, mat-step-header',
+  selector: 'mat-step-header',
   templateUrl: 'step-header.html',
   styleUrls: ['step-header.css'],
   host: {
@@ -22,54 +33,71 @@ import {MdStepLabel} from './step-label';
     'role': 'tab',
   },
   encapsulation: ViewEncapsulation.None,
-  providers: [{provide: MATERIAL_COMPATIBILITY_MODE, useValue: false}],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MdStepHeader {
-  /** Icon for the given step. */
-  @Input() icon: string;
+export class MatStepHeader implements OnDestroy {
+  private _intlSubscription: Subscription;
+
+  /** State of the given step. */
+  @Input() state: string;
 
   /** Label of the given step. */
-  @Input() label: MdStepLabel | string;
+  @Input() label: MatStepLabel | string;
+
+  /** Overrides for the header icons, passed in via the stepper. */
+  @Input() iconOverrides: {[key: string]: TemplateRef<MatStepperIconContext>};
 
   /** Index of the given step. */
-  @Input()
-  get index() { return this._index; }
-  set index(value: any) {
-    this._index = coerceNumberProperty(value);
-  }
-  private _index: number;
+  @Input() index: number;
 
   /** Whether the given step is selected. */
-  @Input()
-  get selected() { return this._selected; }
-  set selected(value: any) {
-    this._selected = coerceBooleanProperty(value);
-  }
-  private _selected: boolean;
+  @Input() selected: boolean;
 
   /** Whether the given step label is active. */
-  @Input()
-  get active() { return this._active; }
-  set active(value: any) {
-    this._active = coerceBooleanProperty(value);
-  }
-  private _active: boolean;
+  @Input() active: boolean;
 
   /** Whether the given step is optional. */
-  @Input()
-  get optional() { return this._optional; }
-  set optional(value: any) {
-    this._optional = coerceBooleanProperty(value);
+  @Input() optional: boolean;
+
+  constructor(
+    public _intl: MatStepperIntl,
+    private _focusMonitor: FocusMonitor,
+    private _element: ElementRef,
+    changeDetectorRef: ChangeDetectorRef) {
+    _focusMonitor.monitor(_element.nativeElement, true);
+    this._intlSubscription = _intl.changes.subscribe(() => changeDetectorRef.markForCheck());
   }
-  private _optional: boolean;
+
+  ngOnDestroy() {
+    this._intlSubscription.unsubscribe();
+    this._focusMonitor.stopMonitoring(this._element.nativeElement);
+  }
 
   /** Returns string label of given step if it is a text label. */
   _stringLabel(): string | null {
-    return this.label instanceof MdStepLabel ? null : this.label;
+    return this.label instanceof MatStepLabel ? null : this.label;
   }
 
-  /** Returns MdStepLabel if the label of given step is a template label. */
-  _templateLabel(): MdStepLabel | null {
-    return this.label instanceof MdStepLabel ? this.label : null;
+  /** Returns MatStepLabel if the label of given step is a template label. */
+  _templateLabel(): MatStepLabel | null {
+    return this.label instanceof MatStepLabel ? this.label : null;
+  }
+
+  /** Returns the host HTML element. */
+  _getHostElement() {
+    return this._element.nativeElement;
+  }
+
+  /** Template context variables that are exposed to the `matStepperIcon` instances. */
+  _getIconContext(): MatStepperIconContext {
+    return {
+      index: this.index,
+      active: this.active,
+      optional: this.optional
+    };
+  }
+
+  focus() {
+    this._getHostElement().focus();
   }
 }

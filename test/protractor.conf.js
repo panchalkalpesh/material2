@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 
 // Load ts-node to be able to execute TypeScript files with protractor.
@@ -25,8 +24,8 @@ const config = {
       path: '../tools/axe-protractor/axe-protractor.js',
 
       rules: [
-        // Exclude md-menu elements because those are empty if not active.
-        { id: 'aria-required-children', selector: '*:not(md-menu)' },
+        // Exclude mat-menu elements because those are empty if not active.
+        { id: 'aria-required-children', selector: '*:not(mat-menu)' },
 
         // Disable color constrast checks since the final colors will vary based on the theme.
         { id: 'color-contrast', enabled: false },
@@ -37,12 +36,12 @@ const config = {
 
 if (process.env['TRAVIS']) {
   const key = require('../scripts/saucelabs/sauce_config');
+
   config.sauceUser = process.env['SAUCE_USERNAME'];
   config.sauceKey = key;
   config.capabilities = {
     'browserName': 'chrome',
     'version': 'latest',
-    'chromedriverVersion': '2.28',
     'tunnel-identifier': process.env['TRAVIS_JOB_ID'],
     'build': process.env['TRAVIS_JOB_ID'],
     'name': 'Material E2E Tests',

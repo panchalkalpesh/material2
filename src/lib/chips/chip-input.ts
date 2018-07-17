@@ -1,47 +1,54 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {
-  Directive,
-  ElementRef,
-  Output,
-  EventEmitter,
-  Input,
-} from '@angular/core';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
-import {ENTER} from '@angular/material/core';
-import {MdChipList} from './chip-list';
+import {Directive, ElementRef, EventEmitter, Input, Output, Inject} from '@angular/core';
+import {MatChipList} from './chip-list';
+import {MAT_CHIPS_DEFAULT_OPTIONS, MatChipsDefaultOptions} from './chip-default-options';
 
-export interface MdChipInputEvent {
+
+/** Represents an input event on a `matChipInput`. */
+export interface MatChipInputEvent {
+  /** The native `<input>` element that the event is being fired for. */
   input: HTMLInputElement;
+
+  /** The value of the input. */
   value: string;
 }
 
+// Increasing integer for generating unique ids.
+let nextUniqueId = 0;
+
 /**
- * Directive that adds chip-specific behaviors to an input element inside <md-form-field>.
- * May be placed inside or outside of an <md-chip-list>.
+ * Directive that adds chip-specific behaviors to an input element inside `<mat-form-field>`.
+ * May be placed inside or outside of an `<mat-chip-list>`.
  */
 @Directive({
-  selector: 'input[mdChipInputFor], input[matChipInputFor]',
+  selector: 'input[matChipInputFor]',
+  exportAs: 'matChipInput, matChipInputFor',
   host: {
     'class': 'mat-chip-input mat-input-element',
     '(keydown)': '_keydown($event)',
     '(blur)': '_blur()',
     '(focus)': '_focus()',
+    '(input)': '_onInput()',
+    '[id]': 'id',
+    '[attr.placeholder]': 'placeholder || null',
   }
 })
-export class MdChipInput {
+export class MatChipInput {
+  /** Whether the control is focused. */
   focused: boolean = false;
-  _chipList: MdChipList;
+  _chipList: MatChipList;
 
   /** Register input for chip list */
-  @Input('mdChipInputFor')
-  set chipList(value: MdChipList) {
+  @Input('matChipInputFor')
+  set chipList(value: MatChipList) {
     if (value) {
       this._chipList = value;
       this._chipList.registerInput(this);
@@ -51,9 +58,9 @@ export class MdChipInput {
   /**
    * Whether or not the chipEnd event will be emitted when the input is blurred.
    */
-  @Input('mdChipInputAddOnBlur')
-  get addOnBlur() { return this._addOnBlur; }
-  set addOnBlur(value) { this._addOnBlur = coerceBooleanProperty(value); }
+  @Input('matChipInputAddOnBlur')
+  get addOnBlur(): boolean { return this._addOnBlur; }
+  set addOnBlur(value: boolean) { this._addOnBlur = coerceBooleanProperty(value); }
   _addOnBlur: boolean = false;
 
   /**
@@ -62,34 +69,32 @@ export class MdChipInput {
    * Defaults to `[ENTER]`.
    */
   // TODO(tinayuangao): Support Set here
-  @Input('mdChipInputSeparatorKeyCodes') separatorKeyCodes: number[] = [ENTER];
+  @Input('matChipInputSeparatorKeyCodes')
+  separatorKeyCodes: number[] = this._defaultOptions.separatorKeyCodes;
 
   /** Emitted when a chip is to be added. */
-  @Output('mdChipInputTokenEnd')
-  chipEnd = new EventEmitter<MdChipInputEvent>();
+  @Output('matChipInputTokenEnd')
+  chipEnd: EventEmitter<MatChipInputEvent> = new EventEmitter<MatChipInputEvent>();
 
-  @Input('matChipInputFor')
-  set matChipList(value: MdChipList) { this.chipList = value; }
-
-  @Input('matChipInputAddOnBlur')
-  get matAddOnBlur() { return this._addOnBlur; }
-  set matAddOnBlur(value) { this.addOnBlur = value; }
-
-  @Input('matChipInputSeparatorKeyCodes')
-  get matSeparatorKeyCodes() { return this.separatorKeyCodes; }
-  set matSeparatorKeyCodes(v: number[]) { this.separatorKeyCodes = v; }
-
+  /**
+   * The input's placeholder text.
+   * @deprecated Bind to the `placeholder` attribute directly.
+   * @deletion-target 7.0.0
+   */
   @Input() placeholder: string = '';
 
-  get empty(): boolean {
-    let value: string | null = this._inputElement.value;
-    return value == null || value === '';
-  }
+  /** Unique id for the input. */
+  @Input() id: string = `mat-chip-list-input-${nextUniqueId++}`;
+
+  /** Whether the input is empty. */
+  get empty(): boolean { return !this._inputElement.value; }
 
   /** The native input element to which this directive is attached. */
   protected _inputElement: HTMLInputElement;
 
-  constructor(protected _elementRef: ElementRef) {
+  constructor(
+    protected _elementRef: ElementRef,
+    @Inject(MAT_CHIPS_DEFAULT_OPTIONS) private _defaultOptions: MatChipsDefaultOptions) {
     this._inputElement = this._elementRef.nativeElement as HTMLInputElement;
   }
 
@@ -130,5 +135,11 @@ export class MdChipInput {
     }
   }
 
-  focus() { this._inputElement.focus(); }
+  _onInput() {
+    // Let chip list know whenever the value changes.
+    this._chipList.stateChanges.next();
+  }
+
+  /** Focuses the input. */
+  focus(): void { this._inputElement.focus(); }
 }

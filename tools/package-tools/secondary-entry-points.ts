@@ -48,7 +48,7 @@ export function getSecondaryEntryPointsForPackage(pkg: BuildPackage) {
     .split('\n')
     .filter(n => n)
     .map(importStatement => importStatement.match(importRegex)![1])
-    .filter(n => nodeLookup.has(n))
+    .filter(n => nodeLookup.has(n) && n !== node.name)
     .map(depName => nodeLookup.get(depName)!) || [];
   });
 
@@ -92,10 +92,10 @@ interface BuildNode {
 
 
 /**
- * Partitions nodes into groups by depth. For example,
+ * `Partitions nodes into groups by depth. For example,
  * [{name: a11y, depth: 1}, {name: bidi, depth: 0}, {name: platform, depth: 0}]
  * =>
- * [ [{name: bidi, depth: 0}, {name: platform, depth: 0}], [{name: a11y, depth: 1}] ]
+ * [ [{name: bidi, depth: 0}, {name: platform, depth: 0}], [{name: a11y, depth: 1}] ]`
  */
 function partitionNodesByDepth(nodes: BuildNode[]): BuildNode[][] {
   const result: BuildNode[][] = [[]];

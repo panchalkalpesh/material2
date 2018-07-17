@@ -1,24 +1,30 @@
 import {Component, Inject} from '@angular/core';
-import {MdDialog, MdDialogRef, MD_DIALOG_DATA} from '@angular/material';
+import {MatDialog, MatDialogRef, MAT_DIALOG_DATA} from '@angular/material';
+
+export interface DialogData {
+  animal: string;
+  name: string;
+}
 
 /**
  * @title Dialog Overview
  */
 @Component({
   selector: 'dialog-overview-example',
-  templateUrl: 'dialog-overview-example.html'
+  templateUrl: 'dialog-overview-example.html',
+  styleUrls: ['dialog-overview-example.css'],
 })
 export class DialogOverviewExample {
 
   animal: string;
   name: string;
 
-  constructor(public dialog: MdDialog) {}
+  constructor(public dialog: MatDialog) {}
 
   openDialog(): void {
-    let dialogRef = this.dialog.open(DialogOverviewExampleDialog, {
+    const dialogRef = this.dialog.open(DialogOverviewExampleDialog, {
       width: '250px',
-      data: { name: this.name, animal: this.animal }
+      data: {name: this.name, animal: this.animal}
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -36,8 +42,8 @@ export class DialogOverviewExample {
 export class DialogOverviewExampleDialog {
 
   constructor(
-    public dialogRef: MdDialogRef<DialogOverviewExampleDialog>,
-    @Inject(MD_DIALOG_DATA) public data: any) { }
+    public dialogRef: MatDialogRef<DialogOverviewExampleDialog>,
+    @Inject(MAT_DIALOG_DATA) public data: DialogData) {}
 
   onNoClick(): void {
     this.dialogRef.close();

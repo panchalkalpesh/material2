@@ -1,40 +1,33 @@
-<div class="example-container mat-elevation-z8">
-  <div class="example-header">
-    <md-form-field floatPlaceholder="never">
-      <input mdInput #filter placeholder="Filter users">
-    </md-form-field>
-  </div>
+<mat-form-field>
+  <input matInput (keyup)="applyFilter($event.target.value)" placeholder="Filter">
+</mat-form-field>
 
-  <md-table #table [dataSource]="dataSource">
+<table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
 
-    <!--- Note that these columns can be defined in any order.
-          The actual rendered columns are set as a property on the row definition" -->
+  <!-- Position Column -->
+  <ng-container matColumnDef="position">
+    <th mat-header-cell *matHeaderCellDef> No. </th>
+    <td mat-cell *matCellDef="let element"> {{element.position}} </td>
+  </ng-container>
 
-    <!-- ID Column -->
-    <ng-container mdColumnDef="userId">
-      <md-header-cell *mdHeaderCellDef> ID </md-header-cell>
-      <md-cell *mdCellDef="let row"> {{row.id}} </md-cell>
-    </ng-container>
+  <!-- Name Column -->
+  <ng-container matColumnDef="name">
+    <th mat-header-cell *matHeaderCellDef> Name </th>
+    <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+  </ng-container>
 
-    <!-- Progress Column -->
-    <ng-container mdColumnDef="progress">
-      <md-header-cell *mdHeaderCellDef> Progress </md-header-cell>
-      <md-cell *mdCellDef="let row"> {{row.progress}}% </md-cell>
-    </ng-container>
+  <!-- Weight Column -->
+  <ng-container matColumnDef="weight">
+    <th mat-header-cell *matHeaderCellDef> Weight </th>
+    <td mat-cell *matCellDef="let element"> {{element.weight}} </td>
+  </ng-container>
 
-    <!-- Name Column -->
-    <ng-container mdColumnDef="userName">
-      <md-header-cell *mdHeaderCellDef> Name </md-header-cell>
-      <md-cell *mdCellDef="let row"> {{row.name}} </md-cell>
-    </ng-container>
+  <!-- Symbol Column -->
+  <ng-container matColumnDef="symbol">
+    <th mat-header-cell *matHeaderCellDef> Symbol </th>
+    <td mat-cell *matCellDef="let element"> {{element.symbol}} </td>
+  </ng-container>
 
-    <!-- Color Column -->
-    <ng-container mdColumnDef="color">
-      <md-header-cell *mdHeaderCellDef> Color </md-header-cell>
-      <md-cell *mdCellDef="let row" [style.color]="row.color"> {{row.color}} </md-cell>
-    </ng-container>
-
-    <md-header-row *mdHeaderRowDef="displayedColumns"></md-header-row>
-    <md-row *mdRowDef="let row; columns: displayedColumns;"></md-row>
-  </md-table>
-</div>
+  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+  <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>

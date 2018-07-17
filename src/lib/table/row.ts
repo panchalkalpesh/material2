@@ -1,68 +1,79 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ChangeDetectionStrategy, Component, Directive, ViewEncapsulation} from '@angular/core';
 import {
+  ChangeDetectionStrategy,
+  Component,
+  Directive,
+  IterableDiffers, TemplateRef,
+  ViewEncapsulation
+} from '@angular/core';
+import {
+  CDK_ROW_TEMPLATE, CdkFooterRow, CdkFooterRowDef,
   CdkHeaderRow,
-  CdkRow,
-  CDK_ROW_TEMPLATE,
-  CdkRowDef,
   CdkHeaderRowDef,
+  CdkRow,
+  CdkRowDef,
 } from '@angular/cdk/table';
 
-/** Workaround for https://github.com/angular/angular/issues/17849 */
-export const _MdHeaderRowDef = CdkHeaderRowDef;
-export const _MdCdkRowDef = CdkRowDef;
-export const _MdHeaderRow = CdkHeaderRow;
-export const _MdRow = CdkRow;
-
 /**
- * Header row definition for the md-table.
+ * Header row definition for the mat-table.
  * Captures the header row's template and other header properties such as the columns to display.
  */
 @Directive({
-  selector: '[mdHeaderRowDef]',
-  providers: [{provide: CdkHeaderRowDef, useExisting: MdHeaderRowDef}],
-  inputs: ['columns: mdHeaderRowDef'],
-})
-export class MdHeaderRowDef extends _MdHeaderRowDef { }
-
-/** Mat-compatible version of MdHeaderRowDef */
-@Directive({
   selector: '[matHeaderRowDef]',
   providers: [{provide: CdkHeaderRowDef, useExisting: MatHeaderRowDef}],
-  inputs: ['columns: matHeaderRowDef'],
+  inputs: ['columns: matHeaderRowDef', 'sticky: matHeaderRowDefSticky'],
 })
-export class MatHeaderRowDef extends _MdHeaderRowDef { }
+export class MatHeaderRowDef extends CdkHeaderRowDef {
+  // TODO(andrewseguin): Remove this constructor after compiler-cli is updated; see issue #9329
+  constructor(template: TemplateRef<any>, _differs: IterableDiffers) {
+    super(template, _differs);
+  }
+}
 
 /**
- * Data row definition for the md-table.
- * Captures the header row's template and other row properties such as the columns to display.
+ * Footer row definition for the mat-table.
+ * Captures the footer row's template and other footer properties such as the columns to display.
  */
 @Directive({
-  selector: '[mdRowDef]',
-  providers: [{provide: CdkRowDef, useExisting: MdRowDef}],
-  inputs: ['columns: mdRowDefColumns'],
+  selector: '[matFooterRowDef]',
+  providers: [{provide: CdkFooterRowDef, useExisting: MatFooterRowDef}],
+  inputs: ['columns: matFooterRowDef', 'sticky: matFooterRowDefSticky'],
 })
-export class MdRowDef extends _MdCdkRowDef { }
+export class MatFooterRowDef extends CdkFooterRowDef {
+  // TODO(andrewseguin): Remove this constructor after compiler-cli is updated; see issue #9329
+  constructor(template: TemplateRef<any>, _differs: IterableDiffers) {
+    super(template, _differs);
+  }
+}
 
-/** Mat-compatible version of MdRowDef */
+/**
+ * Data row definition for the mat-table.
+ * Captures the footer row's template and other footer properties such as the columns to display and
+ * a when predicate that describes when this row should be used.
+ */
 @Directive({
   selector: '[matRowDef]',
   providers: [{provide: CdkRowDef, useExisting: MatRowDef}],
-  inputs: ['columns: matRowDefColumns'],
+  inputs: ['columns: matRowDefColumns', 'when: matRowDefWhen'],
 })
-export class MatRowDef extends _MdCdkRowDef { }
+export class MatRowDef<T> extends CdkRowDef<T> {
+  // TODO(andrewseguin): Remove this constructor after compiler-cli is updated; see issue #9329
+  constructor(template: TemplateRef<any>, _differs: IterableDiffers) {
+    super(template, _differs);
+  }
+}
 
-/** Header template container that contains the cell outlet. Adds the right class and role. */
+/** Footer template container that contains the cell outlet. Adds the right class and role. */
 @Component({
   moduleId: module.id,
-  selector: 'md-header-row, mat-header-row',
+  selector: 'mat-header-row, tr[mat-header-row]',
   template: CDK_ROW_TEMPLATE,
   host: {
     'class': 'mat-header-row',
@@ -70,13 +81,31 @@ export class MatRowDef extends _MdCdkRowDef { }
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
+  exportAs: 'matHeaderRow',
+  providers: [{provide: CdkHeaderRow, useExisting: MatHeaderRow}],
 })
-export class MdHeaderRow extends _MdHeaderRow { }
+export class MatHeaderRow extends CdkHeaderRow { }
+
+/** Footer template container that contains the cell outlet. Adds the right class and role. */
+@Component({
+  moduleId: module.id,
+  selector: 'mat-footer-row, tr[mat-footer-row]',
+  template: CDK_ROW_TEMPLATE,
+  host: {
+    'class': 'mat-footer-row',
+    'role': 'row',
+  },
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
+  exportAs: 'matFooterRow',
+  providers: [{provide: CdkFooterRow, useExisting: MatFooterRow}],
+})
+export class MatFooterRow extends CdkFooterRow { }
 
 /** Data row template container that contains the cell outlet. Adds the right class and role. */
 @Component({
   moduleId: module.id,
-  selector: 'md-row, mat-row',
+  selector: 'mat-row, tr[mat-row]',
   template: CDK_ROW_TEMPLATE,
   host: {
     'class': 'mat-row',
@@ -84,5 +113,7 @@ export class MdHeaderRow extends _MdHeaderRow { }
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
+  exportAs: 'matRow',
+  providers: [{provide: CdkRow, useExisting: MatRow}],
 })
-export class MdRow extends _MdRow { }
+export class MatRow extends CdkRow { }
